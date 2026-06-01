@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # PHP Backend API
+  api:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.api
+    ports:
+      - "8080:80"
+    volumes:
+      - ../backend:/var/www/html
+    environment:
+      - APP_ENV=development
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - autothreads
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: autothreads
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../backend/database:/docker-entrypoint-initdb.d
+    networks:
+      - autothreads
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - autothreads
+
+  # React Frontend (dev)
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    networks:
+      - autothreads
+
+volumes:
+  mysql_data:
+
+networks:
+  autothreads:
+    driver: bridge
