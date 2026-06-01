@@ -6,10 +6,14 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
+      // Proxy API calls to the WAMP/Apache backend.
+      // /api/v1/... -> http://localhost/AutoThreads/backend/public/api/v1/...
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost',
         changeOrigin: true,
+        rewrite: (path) => `/AutoThreads/backend/public${path}`,
       },
     },
   },
+
 });

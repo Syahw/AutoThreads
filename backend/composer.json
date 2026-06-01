@@ -6,6 +6,7 @@
         "php": "^8.2",
         "slim/slim": "^4.12",
         "slim/psr7": "^1.6",
+        "php-di/php-di": "^7.0",
         "illuminate/database": "^11.0",
         "firebase/php-jwt": "^6.10",
         "vlucas/phpdotenv": "^5.6",
@@ -21,7 +22,10 @@
     "autoload": {
         "psr-4": {
             "AutoThreads\\": "src/"
-        }
+        },
+        "files": [
+            "src/helpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -34,5 +38,12 @@
         "seed": "php database/seed.php",
         "serve": "php -S localhost:8080 -t public",
         "worker": "php src/Queue/worker.php"
+    },
+    "config": {
+        "policy": {
+            "advisories": {
+                "block": false
+            }
+        }
     }
 }

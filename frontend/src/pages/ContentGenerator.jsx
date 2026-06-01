@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { Sparkles, RefreshCw, Check, X } from 'lucide-react';
+import { Sparkles, RefreshCw, Check, X, Loader2 } from 'lucide-react';
 
 const categories = [
   'story', 'product_recommendation', 'comparison', 'productivity_tip',
@@ -39,24 +39,34 @@ export default function ContentGenerator() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content'] }),
   });
 
+  const rejectMutation = useMutation({
+    mutationFn: (id) => api.delete(`/content/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content'] }),
+  });
+
+  const regenerateMutation = useMutation({
+    mutationFn: (id) => api.post(`/content/${id}/regenerate`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content'] }),
+  });
+
   const handleGenerate = () => {
     generateMutation.mutate(config);
   };
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Content Generator</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Content Generator</h1>
 
       {/* Generation Form */}
-      <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm mb-6">
+      <div className="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm mb-6">
         <h2 className="text-lg font-semibold mb-4">Generate New Content</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Niche</label>
             <select
               value={config.niche_id}
               onChange={(e) => setConfig({ ...config, niche_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             >
               <option value="">Select niche</option>
               {niches?.map((n) => (
@@ -69,7 +79,7 @@ export default function ContentGenerator() {
             <select
               value={config.category}
               onChange={(e) => setConfig({ ...config, category: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             >
               {categories.map((c) => (
                 <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>
@@ -81,7 +91,7 @@ export default function ContentGenerator() {
             <select
               value={config.tone}
               onChange={(e) => setConfig({ ...config, tone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             >
               <option value="">Auto-rotate</option>
               {tones.map((t) => (
@@ -94,17 +104,17 @@ export default function ContentGenerator() {
             <input
               type="number" min="1" max="5"
               value={config.variations}
-              onChange={(e) => setConfig({ ...config, variations: parseInt(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              onChange={(e) => setConfig({ ...config, variations: parseInt(e.target.value) || 1 })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             />
           </div>
         </div>
         <button
           onClick={handleGenerate}
           disabled={generateMutation.isPending}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
         >
-          <Sparkles size={16} />
+          {generateMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
           {generateMutation.isPending ? 'Generating...' : 'Generate Content'}
         </button>
       </div>
@@ -112,9 +122,9 @@ export default function ContentGenerator() {
       {/* Generated Posts */}
       <div className="space-y-4">
         {posts?.map((post) => (
-          <div key={post.id} className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex gap-2">
+          <div key={post.id} className="bg-white rounded-xl p-4 sm:p-5 border border-gray-100 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+              <div className="flex flex-wrap gap-2">
                 <span className="px-2 py-1 text-xs bg-gray-100 rounded">{post.category}</span>
                 <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">{post.tone}</span>
                 <span className="px-2 py-1 text-xs bg-purple-50 text-purple-700 rounded">
@@ -127,20 +137,30 @@ export default function ContentGenerator() {
                 'bg-red-50 text-red-700'
               }`}>{post.status}</span>
             </div>
-            <p className="text-gray-800 whitespace-pre-line mb-3">{post.content}</p>
+            <p className="text-gray-800 whitespace-pre-line mb-3 text-sm sm:text-base">{post.content}</p>
             {post.status === 'draft' && (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => approveMutation.mutate(post.id)}
-                  className="flex items-center gap-1 px-3 py-1 text-sm bg-green-50 text-green-700 rounded hover:bg-green-100"
+                  disabled={approveMutation.isPending}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-50 text-green-700 rounded hover:bg-green-100 disabled:opacity-50"
                 >
                   <Check size={14} /> Approve
                 </button>
-                <button className="flex items-center gap-1 px-3 py-1 text-sm bg-red-50 text-red-700 rounded hover:bg-red-100">
+                <button
+                  onClick={() => rejectMutation.mutate(post.id)}
+                  disabled={rejectMutation.isPending}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded hover:bg-red-100 disabled:opacity-50"
+                >
                   <X size={14} /> Reject
                 </button>
-                <button className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">
-                  <RefreshCw size={14} /> Regenerate
+                <button
+                  onClick={() => regenerateMutation.mutate(post.id)}
+                  disabled={regenerateMutation.isPending}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100 disabled:opacity-50"
+                >
+                  {regenerateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  Regenerate
                 </button>
               </div>
             )}

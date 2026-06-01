@@ -1,0 +1,22 @@
+# AutoThreads API - Apache rewrite rules for Slim front controller
+# Routes every request that isn't a real file/dir through index.php.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # If running under a subdirectory (e.g. /AutoThreads/backend/public),
+    # this still works because Slim auto-detects the base path in index.php.
+
+    # Don't rewrite requests for existing files or directories.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Send everything else to the front controller.
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Pass the Authorization header through to PHP (needed for JWT auth).
+<IfModule mod_headers.c>
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+</IfModule>

@@ -30,15 +30,15 @@ class PromptBuilder
     ];
 
     private array $categoryTemplates = [
-        'story' => 'Write a short personal story or anecdote that naturally leads to recommending {product}. Make it feel like sharing with a friend.',
-        'product_recommendation' => 'Create a genuine product recommendation for {product} that feels like organic advice, not an ad. Focus on one specific benefit.',
-        'comparison' => 'Write a brief comparison post that positions {product} favorably without bashing alternatives. Use "I tried both" framing.',
-        'productivity_tip' => 'Share a productivity tip that naturally incorporates {product} as part of the workflow. Make it actionable.',
-        'viral_hook' => 'Write a scroll-stopping hook followed by valuable insight that connects to {product}. Prioritize curiosity gap.',
-        'opinion' => 'Share a bold opinion about the {niche} space that leads to mentioning {product} as a solution. Be authentic.',
-        'list_post' => 'Create a "X things" style post where one item naturally features {product}. Keep each point concise.',
-        'wish_i_knew' => 'Write a "things I wish I knew earlier" post about {niche} that includes discovering {product} as one insight.',
-        'general' => 'Create engaging Threads content about {niche} that subtly mentions {product}. Prioritize value over promotion.',
+        'story' => 'Tulis cerita pendek atau pengalaman peribadi yang secara natural membawa kepada cadangan {product}. Buat macam cerita dengan kawan.',
+        'product_recommendation' => 'Buat cadangan produk {product} yang genuine, macam nasihat organik bukan iklan. Fokus satu manfaat spesifik.',
+        'comparison' => 'Tulis post perbandingan ringkas yang letak {product} secara positif tanpa bash alternatif lain. Guna framing "aku dah try dua-dua".',
+        'productivity_tip' => 'Kongsi tip produktiviti yang secara natural masukkan {product} sebagai sebahagian workflow. Buat ia actionable.',
+        'viral_hook' => 'Tulis hook yang buat orang stop scroll, diikuti insight bernilai yang connect dengan {product}. Utamakan curiosity gap.',
+        'opinion' => 'Kongsi pendapat berani tentang ruang {niche} yang bawa kepada mention {product} sebagai solusi. Jadi authentic.',
+        'list_post' => 'Buat post gaya "X benda" di mana satu item secara natural feature {product}. Pastikan setiap point ringkas.',
+        'wish_i_knew' => 'Tulis post "benda aku wish aku tahu awal-awal" tentang {niche} yang include jumpa {product} sebagai satu insight.',
+        'general' => 'Buat content Threads yang engaging tentang {niche} yang secara halus mention {product}. Utamakan value berbanding promosi.',
     ];
 
     /**
@@ -86,33 +86,61 @@ class PromptBuilder
 
     private function buildSystemPrompt(string $tone, string $style, string $audience): string
     {
+        // Add randomness to thread flow
+        $flowVariations = [
+            'Sometimes buat Reply 3 lebih emotional daripada factual.',
+            'Kadang-kadang mula Reply 2 dengan soalan.',
+            'Boleh merge insight + example dalam satu reply kalau flow lebih natural.',
+            'Buat Reply 3 macam mini-story yang relatable.',
+            'Reply 4 boleh jadi hot take atau unpopular opinion.',
+        ];
+        $randomFlow = $flowVariations[array_rand($flowVariations)];
+
         return <<<PROMPT
-You are a social media content creator writing for Threads (Meta's text-based platform).
+Kau seorang content creator untuk Threads (platform text-based Meta). Semua output WAJIB dalam Bahasa Malaysia sepenuhnya.
 
-VOICE & STYLE:
+Kau tulis THREAD (bukan single post). Setiap thread ada EXACTLY 5 replies yang connected sebagai satu cerita/idea.
+
+SUARA & GAYA:
 - Tone: {$tone}
-- Writing style: {$style}
+- Gaya penulisan: {$style}
 - Target audience: {$audience}
-- Platform: Threads (500 char limit, text-first, conversational)
+- Platform: Threads (text-first, conversational, setiap reply pendek dan punchy)
 
-CRITICAL RULES:
-1. Write like a real person sharing genuine thoughts, NOT like a marketer
-2. Never use these AI giveaway phrases: "game-changer", "dive into", "unlock", "leverage", "in today's world", "it's worth noting"
-3. Never start with "I" - vary your sentence openings
-4. Use incomplete sentences, casual grammar, and natural speech patterns
-5. Include 1-2 line breaks for readability
-6. Keep total length under 400 characters
-7. If including a product mention, make it feel like a natural aside, not the main point
-8. Create a curiosity gap or emotional hook in the first line
-9. End with engagement bait (question, hot take, or relatable statement) OR a soft CTA
-10. Never use more than 2 hashtags
-11. Vary punctuation - use periods, dashes, ellipses naturally
-12. Sound like you're texting a smart friend, not writing a blog post
+BAHASA:
+- Tulis SEPENUHNYA dalam Bahasa Malaysia
+- Guna bahasa santai ala Malaysian - campur sikit slang kalau sesuai (macam "korang", "memang", "legit", "best gila")
+- Jangan guna bahasa baku yang terlalu formal atau kaku
+- Boleh campur sikit English words yang memang orang Malaysia selalu guna (like "literally", "actually", "serious")
+- Jangan translate direct dari English - tulis macam orang Malaysia betul-betul cakap
+
+STRUKTUR THREAD (WAJIB IKUT):
+Reply 1 (HOOK): Pendek, grab attention (20-30 patah perkataan sahaja). Buat curiosity atau emotional trigger. JANGAN explain lagi.
+Reply 2 (ELABORATION): Expand idea dari Reply 1 (20-30 patah perkataan). Explain context, insight, atau masalah. Keep natural.
+Reply 3 (EXAMPLE/STORY/SCENARIO): Bagi real-life example atau situasi relatable (20-30 patah perkataan). Storytelling style, bukan bullet points.
+Reply 4 (INSIGHT/VALUE SUMMARY): Summarize key takeaway atau opinion (20-30 patah perkataan). Personal take, lesson, atau realization. Punchy atau reflective.
+Reply 5 (CTA/CLOSING): Soft atau direct CTA (20-30 patah perkataan). Kalau ada produk, WAJIB mention kat sini dengan [link]. End dengan engagement hook (soalan/opinion/challenge).
+
+PERATURAN KETAT:
+1. Tulis macam orang biasa share pemikiran genuine, BUKAN macam marketer
+2. Jangan guna frasa AI yang obvious: "game-changer", "dive into", "unlock", "leverage", "dalam dunia hari ini", "perlu diingatkan"
+3. Jangan mula dengan "Saya" - vary pembukaan ayat
+4. Guna ayat tak lengkap, grammar santai, dan corak percakapan natural
+5. Setiap reply MESTI pendek (Threads-native readability)
+6. Seluruh thread mesti rasa macam SATU cerita connected
+7. JANGAN ulang idea yang sama across replies
+8. Hook (Reply 1) JANGAN mention produk directly
+9. CTA (Reply 5) adalah SATU-SATUNYA tempat link dibenarkan
+10. EXACTLY 5 replies - tak lebih, tak kurang
+11. JANGAN guna hashtag langsung
+12. Bunyi macam kau tengah text kawan rapat, bukan tulis blog post
+
+VARIASI FLOW: {$randomFlow}
 
 ANTI-REPETITION:
-- Do not reuse hooks from previous generations
-- Vary sentence length (mix short punchy with medium)
-- Rotate between first person, second person, and observational framing
+- Jangan ulang hook dari generation sebelum
+- Vary panjang ayat (campur pendek punchy dengan sederhana)
+- Rotate antara first person, second person, dan observational framing
 PROMPT;
     }
 
@@ -141,9 +169,14 @@ PROMPT;
             $prompt .= "CTA STYLE: {$ctaInstruction}\n";
         }
 
-        $prompt .= "\nOUTPUT FORMAT:\n";
-        $prompt .= "Return ONLY the post content. No labels, no explanations.\n";
-        $prompt .= "First line = hook. Last line = CTA or engagement closer.";
+        $prompt .= "\nFORMAT OUTPUT (WAJIB IKUT EXACTLY):\n";
+        $prompt .= "Reply 1:\n[hook content]\n\n";
+        $prompt .= "Reply 2:\n[elaboration content]\n\n";
+        $prompt .= "Reply 3:\n[example/story content]\n\n";
+        $prompt .= "Reply 4:\n[insight/value content]\n\n";
+        $prompt .= "Reply 5:\n[cta/closing content]\n\n";
+        $prompt .= "Tulis sepenuhnya dalam Bahasa Malaysia (santai, natural, macam orang Malaysia cakap).\n";
+        $prompt .= "JANGAN tambah apa-apa text lain selain format di atas. EXACTLY 5 replies.";
 
         return $prompt;
     }
@@ -151,12 +184,12 @@ PROMPT;
     private function getCTAInstruction(string $style): string
     {
         return match ($style) {
-            'soft' => 'Mention naturally in passing, like "been using X lately" or "found X helpful"',
-            'direct' => 'Include a clear but non-pushy recommendation with link placeholder [link]',
-            'curiosity' => 'Tease the product without naming it directly, create intrigue',
-            'urgency' => 'Mention a time-sensitive aspect naturally (limited, just launched, etc)',
-            'social_proof' => 'Frame as "everyone I know is using" or "my whole feed is talking about"',
-            default => 'Mention naturally without being promotional',
+            'soft' => 'Sebut secara natural macam "aku dah guna X lately" atau "jumpa X ni memang helpful"',
+            'direct' => 'Masukkan cadangan yang jelas tapi tak pushy dengan placeholder link [link]',
+            'curiosity' => 'Tease produk tanpa sebut nama terus, buat orang curious',
+            'urgency' => 'Sebut aspek time-sensitive secara natural (limited, baru launch, etc)',
+            'social_proof' => 'Frame macam "semua orang aku kenal dah guna" atau "feed aku penuh pasal ni"',
+            default => 'Sebut secara natural tanpa nampak promotional',
         };
     }
 }

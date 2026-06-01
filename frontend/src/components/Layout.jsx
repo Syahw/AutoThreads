@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import {
   LayoutDashboard, Sparkles, Calendar, Tag,
-  Link2, BarChart3, Settings, LogOut,
+  Link2, BarChart3, Settings, LogOut, Menu, X,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -18,22 +19,46 @@ const navItems = [
 
 export default function Layout() {
   const { user, logout } = useAuthStore();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-100">
-          <h1 className="text-xl font-bold text-gray-900">AutoThreads</h1>
-          <p className="text-sm text-gray-500 mt-1">AI Content Automation</p>
+      <aside
+        className={clsx(
+          'fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-200 ease-in-out lg:static lg:translate-x-0',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">AutoThreads</h1>
+            <p className="text-sm text-gray-500 mt-1">AI Content Automation</p>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-1 text-gray-500 hover:text-gray-700"
+            aria-label="Close sidebar"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1" aria-label="Main navigation">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto" aria-label="Main navigation">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
+              onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
                 clsx(
                   'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -72,11 +97,25 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">
-          <Outlet />
-        </div>
-      </main>
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile header */}
+        <header className="lg:hidden flex items-center gap-3 p-4 bg-white border-b border-gray-200">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+            aria-label="Open sidebar"
+          >
+            <Menu size={20} />
+          </button>
+          <h1 className="text-lg font-bold text-gray-900">AutoThreads</h1>
+        </header>
+
+        <main className="flex-1 overflow-auto">
+          <div className="p-4 sm:p-6 lg:p-8">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

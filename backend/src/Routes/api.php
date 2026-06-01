@@ -20,8 +20,21 @@ use AutoThreads\Controllers\AnalyticsController;
 use AutoThreads\Controllers\SettingsController;
 use AutoThreads\Controllers\ThreadsController;
 
+// API root - friendly landing response so the base URL isn't a 404
+$app->get('/', function ($request, $response) {
+    $response->getBody()->write(json_encode([
+        'name' => 'AutoThreads API',
+        'version' => '1.0.0',
+        'status' => 'running',
+        'docs' => '/api/v1',
+        'health' => '/health',
+    ]));
+    return $response->withHeader('Content-Type', 'application/json');
+});
+
 // Health check
 $app->get('/health', function ($request, $response) {
+
     $response->getBody()->write(json_encode([
         'status' => 'ok',
         'version' => '1.0.0',

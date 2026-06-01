@@ -23,9 +23,16 @@ class Humanizer
         'I cannot stress enough', 'absolutely essential',
         'revolutionary', 'groundbreaking', 'cutting-edge',
         'seamlessly', 'effortlessly', 'streamline',
+        // BM AI giveaway phrases
+        'dalam dunia hari ini', 'perlu diingatkan',
+        'tidak dapat dinafikan', 'sesungguhnya',
+        'adalah penting untuk', 'di samping itu',
+        'sehubungan dengan itu', 'tambahan pula',
+        'secara keseluruhannya', 'pada hakikatnya',
+        'walau bagaimanapun', 'kesimpulannya',
     ];
-
     private array $replacements = [
+        // Existing AI phrase replacements
         'game-changer' => 'solid find',
         'game changer' => 'solid find',
         'dive into' => 'check out',
@@ -39,30 +46,153 @@ class Humanizer
         'seamlessly' => 'smoothly',
         'effortlessly' => 'easily',
         'streamline' => 'simplify',
+    
+        // BM formal -> casual
+        'dalam dunia hari ini' => 'sekarang ni',
+        'perlu diingatkan' => '',
+        'tidak dapat dinafikan' => 'memang',
+        'sesungguhnya' => 'seriously',
+        'adalah penting untuk' => 'kena',
+        'di samping itu' => 'lagi satu',
+        'sehubungan dengan itu' => '',
+        'tambahan pula' => 'lagi',
+        'secara keseluruhannya' => 'overall',
+        'pada hakikatnya' => 'sebenarnya',
+        'walau bagaimanapun' => 'tapi',
+        'kesimpulannya' => '',
+    
+        // More natural Malaysian casual speech
+        'kecil' => 'kecik',
+        'besar' => 'besaq',
+        'sedikit' => 'sikit',
+        'sebentar' => 'kejap',
+        'sahaja' => 'je',
+        'juga' => 'jugak',
+        'begitu' => 'camtu',
+        'macam itu' => 'camtu',
+        'seperti itu' => 'camtu',
+        'bagaimana' => 'macam mana',
+        'mengapa' => 'kenapa',
+        'kenapakah' => 'kenapa',
+        'tidak' => 'tak',
+        'hendak' => 'nak',
+        'mahu' => 'nak',
+        'ingin' => 'nak',
+        'sangat' => 'gila',
+        'amat' => 'gila',
+        'memang sangat' => 'serius',
+        'penat' => 'letih gila',
+        'marah' => 'geram',
+        'lucu' => 'kelakar',
+        'kelihatan' => 'nampak',
+        'melihat' => 'tengok',
+        'perkara' => 'benda',
+        'masalah' => 'hal',
+        'berfikir' => 'fikir',
+        'memberitahu' => 'bagitau',
+        'memberikan' => 'bagi',
+        'menggunakan' => 'guna',
+        'membeli' => 'beli',
+        'mencuba' => 'try',
+        'mencubanya' => 'try je',
+        'memerlukan' => 'perlukan',
+        'memudahkan' => 'senangkan',
+        'memang benar' => 'legit',
+        'sungguh' => 'seriously',
+        'terbaik' => 'padu',
+        'hebat' => 'power',
+        'bagus' => 'solid',
+        'baik' => 'nice',
+        'sukar' => 'payah',
+        'mudah' => 'senang',
+        'cepat' => 'laju',
+        'perlahan' => 'slow',
+        'berbaloi' => 'worth',
+        'tidak boleh' => 'tak boleh',
+        'tidak dapat' => 'tak dapat',
+        'bolehkah' => 'boleh ke',
+        'adakah' => '',
+        'saya rasa' => 'aku rasa',
+        'saya fikir' => 'aku rasa',
+        'saya telah' => 'aku dah',
+        'aku telah' => 'aku dah',
+        'sudah' => 'dah',
+        'telah' => 'dah',
+        'belum' => 'lom',
+        'akan' => 'nak',
+        'kepada' => 'kat',
+        'dengan' => 'ngan',
+        'bukan sahaja' => 'bukan je',
+        'kedua-duanya' => 'dua dua sekali',
+        'semuanya' => 'semua sekali',
+        'ramai orang' => 'ramai gila orang',
+        'setiap hari' => 'hari hari',
+        'kadangkala' => 'kadang kadang',
+        'terlalu' => 'terlampau',
+        'benar-benar' => 'betul betul',
+        'masih lagi' => 'still',
+        'langsung tidak' => 'langsung tak',
+        'sungguh-sungguh' => 'betul betul',
+        'secara automatik' => 'auto',
+        'telefon bimbit' => 'phone',
+        'aplikasi' => 'app',
+        'gambar' => 'pic',
+        'video pendek' => 'short video',
+        'media sosial' => 'social media',
+    
+        // More conversational replacements
+        'saya' => 'aku',
+        'anda' => 'korang',
+        'awak' => 'korang',
+        'kamu' => 'korang',
+        'mereka' => 'diorang',
+        'dia' => 'dia je',
     ];
-
-    /**
-     * Process AI-generated content through humanization pipeline
-     */
+   
     public function process(string $rawContent): array
     {
+        // Parse thread replies
+        $replies = $this->parseThreadReplies($rawContent);
+
+        if (count($replies) >= 5) {
+            // Process each reply individually
+            $processedReplies = [];
+            foreach ($replies as $i => $reply) {
+                $processed = $this->removeAIPhrases($reply);
+                $processed = $this->casualizePunctuation($processed);
+                $processed = trim($processed);
+                $processedReplies[$i] = $processed;
+            }
+
+            // Extract components from thread structure
+            $hook = $processedReplies[0] ?? '';
+            $cta = $processedReplies[4] ?? '';
+
+            // Rebuild full content with Reply markers
+            $fullContent = '';
+            foreach ($processedReplies as $i => $reply) {
+                $replyNum = $i + 1;
+                $fullContent .= "Reply {$replyNum}:\n{$reply}\n\n";
+            }
+
+            return [
+                'content' => trim($fullContent),
+                'hook' => $hook,
+                'cta' => $cta,
+                'hashtags' => [],
+                'replies' => $processedReplies,
+            ];
+        }
+
+        // Fallback: single post format (backward compatibility)
         $content = $rawContent;
-
-        // Step 1: Remove AI giveaway phrases
         $content = $this->removeAIPhrases($content);
-
-        // Step 2: Fix over-formal punctuation
         $content = $this->casualizePunctuation($content);
-
-        // Step 3: Ensure proper length for Threads
         $content = $this->enforceLength($content, 500);
 
-        // Step 4: Extract structural components
         $hook = $this->extractHook($content);
         $cta = $this->extractCTA($content);
         $hashtags = $this->extractHashtags($content);
-
-        // Step 5: Clean up hashtags from content body
         $content = $this->removeHashtagsFromBody($content);
 
         return [
@@ -70,7 +200,28 @@ class Humanizer
             'hook' => $hook,
             'cta' => $cta,
             'hashtags' => $hashtags,
+            'replies' => [],
         ];
+    }
+
+    /**
+     * Parse thread replies from AI output
+     * Splits content by "Reply X:" markers
+     */
+    private function parseThreadReplies(string $content): array
+    {
+        $replies = [];
+        // Split by "Reply N:" pattern (case-insensitive)
+        $parts = preg_split('/Reply\s*\d+\s*:/i', $content, -1, PREG_SPLIT_NO_EMPTY);
+
+        foreach ($parts as $part) {
+            $trimmed = trim($part);
+            if (!empty($trimmed)) {
+                $replies[] = $trimmed;
+            }
+        }
+
+        return $replies;
     }
 
     private function removeAIPhrases(string $content): string

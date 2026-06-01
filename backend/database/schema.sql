@@ -26,10 +26,9 @@ CREATE TABLE users (
     settings JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_users_email (email),
     INDEX idx_users_role (role),
     INDEX idx_users_plan (plan)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC;
 
 -- ============================================================
 -- THREADS ACCOUNTS
@@ -50,7 +49,7 @@ CREATE TABLE threads_accounts (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_threads_accounts_user (user_id),
     UNIQUE INDEX idx_threads_user_unique (threads_user_id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC;
 
 -- ============================================================
 -- NICHES
@@ -71,7 +70,7 @@ CREATE TABLE niches (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_niches_user (user_id),
     UNIQUE INDEX idx_niches_user_slug (user_id, slug)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC;
 
 -- ============================================================
 -- TOPICS
@@ -99,7 +98,7 @@ CREATE TABLE topics (
     INDEX idx_topics_niche (niche_id),
     INDEX idx_topics_category (category),
     FULLTEXT INDEX idx_topics_title_ft (title)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC;
 
 -- ============================================================
 -- AFFILIATE LINKS
@@ -126,7 +125,7 @@ CREATE TABLE affiliate_links (
     INDEX idx_affiliate_user (user_id),
     INDEX idx_affiliate_niche (niche_id),
     INDEX idx_affiliate_campaign (campaign_tag)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC;
 
 -- ============================================================
 -- AI PROMPT TEMPLATES
@@ -157,4 +156,4 @@ CREATE TABLE ai_prompt_templates (
     INDEX idx_prompts_category (category),
     INDEX idx_prompts_tone (tone),
     INDEX idx_prompts_user (user_id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC;

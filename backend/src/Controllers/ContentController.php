@@ -55,12 +55,12 @@ class ContentController
 
         $config = [
             'user_id' => $userId,
-            'niche_id' => $data['niche_id'] ?? null,
-            'topic_id' => $data['topic_id'] ?? null,
-            'affiliate_link_id' => $data['affiliate_link_id'] ?? null,
+            'niche_id' => !empty($data['niche_id']) ? $data['niche_id'] : null,
+            'topic_id' => !empty($data['topic_id']) ? $data['topic_id'] : null,
+            'affiliate_link_id' => !empty($data['affiliate_link_id']) ? $data['affiliate_link_id'] : null,
             'category' => $data['category'] ?? 'general',
-            'tone' => $data['tone'] ?? null,
-            'variations' => $data['variations'] ?? 1,
+            'tone' => !empty($data['tone']) ? $data['tone'] : null,
+            'variations' => (int) ($data['variations'] ?? 1),
         ];
 
         try {

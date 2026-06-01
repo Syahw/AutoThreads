@@ -30,10 +30,18 @@ class ContentGenerator
 
     public function __construct()
     {
-        $this->httpClient = new Client([
+        $guzzleOptions = [
             'base_uri' => 'https://api.openai.com/v1/',
             'timeout' => 30,
-        ]);
+        ];
+
+        // Use a CA bundle for SSL verification on Windows/WAMP environments
+        $caBundle = dirname(__DIR__, 3) . '/cacert.pem';
+        if (file_exists($caBundle)) {
+            $guzzleOptions['verify'] = $caBundle;
+        }
+
+        $this->httpClient = new Client($guzzleOptions);
         $this->promptBuilder = new PromptBuilder();
         $this->humanizer = new Humanizer();
         $this->scorer = new QualityScorer();
@@ -91,13 +99,15 @@ class ContentGenerator
             'quality_score' => $scores['overall'],
             'humanization_score' => $scores['humanization'],
             'status' => 'draft',
-            'ai_model' => $_ENV['OPENAI_MODEL'] ?? 'gpt-4',
+            'ai_model' => $_ENV['OPENAI_MODEL'] ?? 'gpt-4o-mini',
             'tokens_used' => $aiResponse['tokens_used'],
             'generation_cost' => $this->calculateCost($aiResponse['tokens_used']),
             'variations_count' => $variations,
             'metadata' => [
                 'prompt_hash' => md5($prompt['user']),
                 'generation_time_ms' => $aiResponse['time_ms'],
+                'replies' => $humanized['replies'] ?? [],
+                'thread_format' => !empty($humanized['replies']),
             ],
         ]);
 

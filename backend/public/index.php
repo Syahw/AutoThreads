@@ -11,12 +11,16 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
+
+require __DIR__ . '/../src/helpers.php';
+
+
 use Slim\Factory\AppFactory;
 use AutoThreads\Config\Bootstrap;
 
-// Load environment variables
+// Load environment variables (safeLoad won't fatal if .env is absent)
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->load();
+$dotenv->safeLoad();
 
 // Bootstrap application (DB, Redis, Logger)
 $container = Bootstrap::init();
@@ -24,11 +28,16 @@ AppFactory::setContainer($container);
 
 $app = AppFactory::create();
 
-// Global middleware
+
+$scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+$basePath = rtrim($scriptDir, '/');
+if ($basePath !== '' && $basePath !== '/') {
+    $app->setBasePath($basePath);
+}
+
 $app->addBodyParsingMiddleware();
 $app->addRoutingMiddleware();
 
-// CORS middleware
 $app->add(new AutoThreads\Middleware\CorsMiddleware());
 
 // Error handling
