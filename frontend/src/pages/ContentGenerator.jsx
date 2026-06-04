@@ -244,7 +244,7 @@ export default function ContentGenerator() {
           </p>
         ) : (
           <p className="text-muted mb-4 text-sm">
-            No link in the thread — good for sharing tips, stories, or opinions. Add an affiliate on the{' '}
+            No link in the thread — good for sharing tips, stories, or opinions. Add an affiliate link on the{' '}
             <Link to="/affiliates" className="font-semibold underline hover:text-slate-700 dark:hover:text-slate-200">
               Affiliates page
             </Link>{' '}
