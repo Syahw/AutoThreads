@@ -3,7 +3,10 @@
 namespace AutoThreads\Controllers;
 
 use AutoThreads\Models\GeneratedPost;
+use AutoThreads\Models\ThreadsAccount;
 use AutoThreads\Services\AI\ContentGenerator;
+use AutoThreads\Services\AI\Humanizer;
+use AutoThreads\Services\Threads\ThreadPublisher;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -126,14 +129,40 @@ class ContentController
             ->where('user_id', $userId)
             ->firstOrFail();
 
-        $post->update([
-            'content' => $data['content'] ?? $post->content,
-            'hook' => $data['hook'] ?? $post->hook,
-            'cta' => $data['cta'] ?? $post->cta,
-            'hashtags' => $data['hashtags'] ?? $post->hashtags,
-        ]);
+        $updates = [];
 
-        return $this->json($response, ['message' => 'Post updated', 'data' => $post]);
+        if (isset($data['content'])) {
+            $updates['content'] = $data['content'];
+        }
+        if (isset($data['hook'])) {
+            $updates['hook'] = $data['hook'];
+        }
+        if (isset($data['cta'])) {
+            $updates['cta'] = $data['cta'];
+        }
+        if (isset($data['hashtags'])) {
+            $updates['hashtags'] = $data['hashtags'];
+        }
+        if (array_key_exists('affiliate_link_id', $data)) {
+            $updates['affiliate_link_id'] = $data['affiliate_link_id'] ?: null;
+        }
+
+        if (!empty($updates['content'])) {
+            $humanizer = new Humanizer();
+            $parsed = $humanizer->parseThreadReplies($updates['content']);
+            if (count($parsed) >= 5) {
+                $metadata = $post->metadata ?? [];
+                $metadata['replies'] = $parsed;
+                $metadata['thread_format'] = true;
+                $updates['metadata'] = $metadata;
+                $updates['hook'] = $updates['hook'] ?? ($parsed[0] ?? $post->hook);
+                $updates['cta'] = $updates['cta'] ?? ($parsed[array_key_last($parsed)] ?? $post->cta);
+            }
+        }
+
+        $post->update($updates);
+
+        return $this->json($response, ['message' => 'Post updated', 'data' => $post->fresh()]);
     }
 
     public function approve(Request $request, Response $response, array $args): Response
@@ -147,6 +176,83 @@ class ContentController
         $post->save();
 
         return $this->json($response, ['message' => 'Post approved', 'data' => $post]);
+    }
+
+    /**
+     * Publish an approved post immediately as a Threads reply chain (no scheduler).
+     */
+    public function publish(Request $request, Response $response, array $args): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $data = $request->getParsedBody() ?? [];
+
+        $post = GeneratedPost::where('id', $args['id'])
+            ->where('user_id', $userId)
+            ->firstOrFail();
+
+        if ($post->status === 'posted') {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Post has already been published',
+            ], 422);
+        }
+
+        if ($post->status !== 'approved') {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Only approved posts can be published. Approve the post first.',
+            ], 422);
+        }
+
+        $accountQuery = ThreadsAccount::where('user_id', $userId)->where('is_active', true);
+
+        if (!empty($data['account_id'])) {
+            $accountQuery->where('id', (int) $data['account_id']);
+        }
+
+        $account = $accountQuery->orderBy('created_at', 'desc')->first();
+
+        if (!$account) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'No connected Threads account. Connect one in Settings first.',
+            ], 422);
+        }
+
+        if (!empty($data['affiliate_link_id'])) {
+            $post->affiliate_link_id = (int) $data['affiliate_link_id'];
+            $post->save();
+        }
+
+        $publisher = new ThreadPublisher();
+
+        try {
+            $result = $publisher->publish($post, $account);
+
+            $metadata = $post->metadata ?? [];
+            $metadata['threads_publish'] = [
+                'root_post_id' => $result['root_post_id'],
+                'post_ids' => $result['post_ids'],
+                'published_count' => $result['published_count'],
+                'account_id' => $account->id,
+                'published_at' => date('c'),
+            ];
+
+            $post->status = 'posted';
+            $post->metadata = $metadata;
+            $post->save();
+
+            return $this->json($response, [
+                'message' => 'Thread published to Threads',
+                'data' => $post,
+                'threads' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Publish failed: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function reject(Request $request, Response $response, array $args): Response

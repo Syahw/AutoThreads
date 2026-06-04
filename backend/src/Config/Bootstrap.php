@@ -19,6 +19,9 @@ class Bootstrap
 {
     public static function init(): Container
     {
+        $schedulerTz = $_ENV['SCHEDULER_TIMEZONE'] ?? 'UTC';
+        date_default_timezone_set($schedulerTz);
+
         $container = new Container();
 
         // Database (Eloquent ORM)

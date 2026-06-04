@@ -2,6 +2,149 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+@layer base {
+  body {
+    @apply font-sans text-slate-800 antialiased dark:text-slate-200;
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply relative min-h-full;
+  }
+
+  .text-heading {
+    @apply text-slate-900 dark:text-slate-50;
+  }
+
+  .text-subheading {
+    @apply text-slate-800 dark:text-slate-200;
+  }
+
+  .text-muted {
+    @apply text-slate-500 dark:text-slate-400;
+  }
+
+  .text-label {
+    @apply text-slate-700 dark:text-slate-300;
+  }
+
+  .panel-muted {
+    @apply rounded-xl border border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/40;
+  }
+
+  .row-hover {
+    @apply transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/50;
+  }
+
+  .alert-error {
+    @apply rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800
+      dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300;
+  }
+
+  .alert-success {
+    @apply rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800
+      dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300;
+  }
+
+  .card {
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card transition-shadow duration-200
+      dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-none;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-card-hover hover:border-brand-200/50
+      dark:hover:border-brand-500/30 dark:hover:shadow-glow;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm
+      placeholder:text-slate-400 transition-colors
+      focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20
+      dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500
+      dark:focus:border-brand-500 dark:focus:ring-brand-500/30;
+  }
+
+  .select-field {
+    @apply input-field appearance-none bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  }
+
+  .dark .select-field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200
+      focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50
+      dark:focus:ring-offset-slate-900;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-gradient text-white shadow-md shadow-brand-500/25 hover:shadow-lg hover:shadow-brand-500/30 focus:ring-brand-500;
+  }
+
+  .btn-secondary {
+    @apply btn border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 focus:ring-slate-400
+      dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-700;
+  }
+
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100 focus:ring-slate-400 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-400
+      dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/50;
+  }
+
+  .btn-success {
+    @apply btn bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-draft {
+    @apply badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300;
+  }
+
+  .badge-approved {
+    @apply badge bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/10
+      dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-500/20;
+  }
+
+  .badge-posted {
+    @apply badge bg-brand-50 text-brand-700 ring-1 ring-brand-600/10
+      dark:bg-brand-950/50 dark:text-brand-300 dark:ring-brand-500/20;
+  }
+
+  .badge-rejected {
+    @apply badge bg-red-50 text-red-700 ring-1 ring-red-600/10
+      dark:bg-red-950/50 dark:text-red-300 dark:ring-red-500/20;
+  }
+
+  .badge-scheduled {
+    @apply badge bg-amber-50 text-amber-700 ring-1 ring-amber-600/10
+      dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-500/20;
+  }
+
+  .icon-box {
+    @apply flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600
+      dark:bg-brand-500/15 dark:text-brand-400;
+  }
+
+  .icon-box-muted {
+    @apply flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600
+      dark:bg-slate-800 dark:text-slate-400;
+  }
+
+  .skeleton {
+    @apply animate-pulse bg-slate-100 dark:bg-slate-800;
+  }
+
+  .code-inline {
+    @apply rounded bg-slate-100 px-1 text-xs dark:bg-slate-800 dark:text-slate-300;
+  }
 }

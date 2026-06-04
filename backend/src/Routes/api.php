@@ -50,6 +50,9 @@ $app->group('/api/v1', function (RouteCollectorProxy $group) {
     $group->post('/auth/login', [AuthController::class, 'login']);
     $group->post('/auth/refresh', [AuthController::class, 'refresh']);
 
+    // Threads OAuth callback (Meta redirect — no JWT)
+    $group->get('/threads/callback', [ThreadsController::class, 'callback']);
+
     // === PROTECTED ROUTES ===
     $group->group('', function (RouteCollectorProxy $protected) {
 
@@ -80,10 +83,15 @@ $app->group('/api/v1', function (RouteCollectorProxy $group) {
         $protected->post('/content/{id}/regenerate', [ContentController::class, 'regenerate']);
         $protected->put('/content/{id}', [ContentController::class, 'update']);
         $protected->put('/content/{id}/approve', [ContentController::class, 'approve']);
+        $protected->post('/content/{id}/publish', [ContentController::class, 'publish']);
         $protected->put('/content/{id}/reject', [ContentController::class, 'reject']);
         $protected->delete('/content/{id}', [ContentController::class, 'destroy']);
 
         // Scheduler
+        $protected->get('/scheduler/settings', [SchedulerController::class, 'settings']);
+        $protected->get('/scheduler/diagnostics', [SchedulerController::class, 'diagnostics']);
+        $protected->get('/scheduler/worker-log', [SchedulerController::class, 'workerLog']);
+        $protected->post('/scheduler/run-now', [SchedulerController::class, 'runNow']);
         $protected->get('/scheduler', [SchedulerController::class, 'index']);
         $protected->post('/scheduler', [SchedulerController::class, 'schedule']);
         $protected->put('/scheduler/{id}/cancel', [SchedulerController::class, 'cancel']);
@@ -103,8 +111,8 @@ $app->group('/api/v1', function (RouteCollectorProxy $group) {
 
         // Threads Integration
         $protected->get('/threads/connect', [ThreadsController::class, 'connect']);
-        $protected->get('/threads/callback', [ThreadsController::class, 'callback']);
         $protected->get('/threads/accounts', [ThreadsController::class, 'accounts']);
+        $protected->delete('/threads/accounts/{id}', [ThreadsController::class, 'disconnect']);
 
         // Settings
         $protected->get('/settings', [SettingsController::class, 'index']);

@@ -36,3 +36,22 @@ if (!function_exists('today')) {
         return Carbon::today($tz);
     }
 }
+
+if (!function_exists('guzzle_ssl_verify')) {
+    /**
+     * CA bundle path for Guzzle on Windows/WAMP, or true if none configured.
+     */
+    function guzzle_ssl_verify(): bool|string
+    {
+        foreach (['SSL_CAFILE', 'CURL_CA_BUNDLE'] as $key) {
+            $envPath = $_ENV[$key] ?? null;
+            if (is_string($envPath) && $envPath !== '' && file_exists($envPath)) {
+                return $envPath;
+            }
+        }
+
+        $caBundle = dirname(__DIR__) . '/cacert.pem';
+
+        return file_exists($caBundle) ? $caBundle : true;
+    }
+}

@@ -1,0 +1,3 @@
+REM Copy this file to php-path.bat to force a specific PHP binary (optional).
+REM Task Scheduler ignores your user PATH — this overrides auto-detect.
+set PHP_EXE=C:\wamp64\bin\php\php8.2.26\php.exe

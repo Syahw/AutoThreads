@@ -1,36 +1,207 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { Link2 } from 'lucide-react';
+import { Link2, MousePointerClick, Plus, Loader2, Trash2 } from 'lucide-react';
+import PageHeader from '../components/ui/PageHeader';
+import EmptyState from '../components/ui/EmptyState';
+
+const ctaStyles = ['soft', 'direct', 'curiosity', 'urgency', 'social_proof'];
 
 export default function Affiliates() {
-  const { data: links } = useQuery({
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [form, setForm] = useState({
+    product_name: '',
+    url: '',
+    short_url: '',
+    cta_style: 'soft',
+  });
+
+  const { data: links, isLoading } = useQuery({
     queryKey: ['affiliates'],
     queryFn: () => api.get('/affiliates').then((r) => r.data.data),
   });
 
+  const createMutation = useMutation({
+    mutationFn: (data) => api.post('/affiliates', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['affiliates'] });
+      setShowForm(false);
+      setFormError('');
+      setForm({ product_name: '', url: '', short_url: '', cta_style: 'soft' });
+    },
+    onError: (err) => {
+      setFormError(err.response?.data?.message || 'Could not save link');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => api.delete(`/affiliates/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['affiliates'] }),
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setFormError('');
+    const payload = {
+      product_name: form.product_name.trim(),
+      url: form.url.trim(),
+      cta_style: form.cta_style,
+    };
+    if (form.short_url.trim()) {
+      payload.short_url = form.short_url.trim();
+    }
+    createMutation.mutate(payload);
+  };
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Affiliate Links</h1>
-      <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-        {!links?.length ? (
-          <div className="text-center py-8">
-            <Link2 size={48} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500">No affiliate links yet</p>
+      <PageHeader
+        title="Affiliate links"
+        description="Save product URLs here. They appear in Content Generator when you generate or publish threads with [link]."
+        action={
+          <button type="button" onClick={() => setShowForm(!showForm)} className="btn-primary">
+            <Plus size={16} /> Add link
+          </button>
+        }
+      />
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="card mb-6 p-6">
+          <h2 className="text-heading mb-1 text-lg font-semibold">New affiliate link</h2>
+          <p className="text-muted mb-4 text-sm">
+            Product name is shown to the AI. URL replaces <code className="code-inline">[link]</code> when you publish.
+          </p>
+
+          {formError && <div className="alert-error mb-4">{formError}</div>}
+
+          <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="product_name" className="text-label mb-1.5 block text-sm font-medium">
+                Product name *
+              </label>
+              <input
+                id="product_name"
+                type="text"
+                value={form.product_name}
+                onChange={(e) => setForm({ ...form, product_name: e.target.value })}
+                className="input-field"
+                placeholder="e.g. Notion Pro"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="cta_style" className="text-label mb-1.5 block text-sm font-medium">
+                CTA style
+              </label>
+              <select
+                id="cta_style"
+                value={form.cta_style}
+                onChange={(e) => setForm({ ...form, cta_style: e.target.value })}
+                className="select-field"
+              >
+                {ctaStyles.map((s) => (
+                  <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="url" className="text-label mb-1.5 block text-sm font-medium">
+                Affiliate URL *
+              </label>
+              <input
+                id="url"
+                type="url"
+                value={form.url}
+                onChange={(e) => setForm({ ...form, url: e.target.value })}
+                className="input-field"
+                placeholder="https://..."
+                required
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="short_url" className="text-label mb-1.5 block text-sm font-medium">
+                Short URL (optional)
+              </label>
+              <input
+                id="short_url"
+                type="url"
+                value={form.short_url}
+                onChange={(e) => setForm({ ...form, short_url: e.target.value })}
+                className="input-field"
+                placeholder="https://bit.ly/... — used on publish if set"
+              />
+            </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {links.map((link) => (
-              <div key={link.id} className="p-4 border border-gray-100 rounded-lg">
-                <h3 className="font-medium text-gray-900">{link.product_name}</h3>
-                <p className="text-sm text-gray-500 truncate">{link.url}</p>
-                <div className="flex gap-4 mt-2 text-xs text-gray-400">
-                  <span>Clicks: {link.click_count}</span>
-                  <span>CTA: {link.cta_style}</span>
-                  <span>Campaign: {link.campaign_tag || 'none'}</span>
-                </div>
-              </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={createMutation.isPending} className="btn-success">
+              {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+              Save link
+            </button>
+            <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      <div className="card overflow-hidden">
+        {isLoading ? (
+          <div className="space-y-3 p-6">
+            {[1, 2].map((i) => (
+              <div key={i} className="skeleton h-20 rounded-xl" />
             ))}
           </div>
+        ) : !links?.length ? (
+          <EmptyState
+            icon={Link2}
+            title="No affiliate links yet"
+            description="Add your first Shopee, Lazada, or other affiliate URL above."
+            action={
+              <button type="button" onClick={() => setShowForm(true)} className="btn-primary">
+                <Plus size={16} /> Add your first link
+              </button>
+            }
+          />
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {links.map((link) => (
+              <li key={link.id} className="row-hover px-6 py-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-heading font-semibold">{link.product_name}</h3>
+                    <p className="mt-1 truncate text-sm text-brand-600 dark:text-brand-400">
+                      {link.short_url || link.url}
+                    </p>
+                    {link.short_url && (
+                      <p className="text-muted mt-0.5 truncate text-xs">{link.url}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="badge-draft">{link.cta_style?.replace(/_/g, ' ')}</span>
+                    <button
+                      type="button"
+                      onClick={() => deleteMutation.mutate(link.id)}
+                      disabled={deleteMutation.isPending}
+                      className="btn-ghost !p-2 text-red-600 dark:text-red-400"
+                      title="Delete link"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="text-muted mt-3 flex flex-wrap gap-4 text-xs">
+                  <span className="flex items-center gap-1">
+                    <MousePointerClick size={12} />
+                    {link.click_count ?? 0} clicks
+                  </span>
+                  <span>Campaign: {link.campaign_tag || 'none'}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

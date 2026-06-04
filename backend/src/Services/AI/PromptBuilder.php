@@ -41,6 +41,19 @@ class PromptBuilder
         'general' => 'Buat content Threads yang engaging tentang {niche} yang secara halus mention {product}. Utamakan value berbanding promosi.',
     ];
 
+    /** Templates when no product / affiliate — sharing & engagement only */
+    private array $sharingCategoryTemplates = [
+        'story' => 'Tulis cerita pendek atau pengalaman peribadi tentang {niche}. Kongsi macam cerita dengan kawan — tiada jualan.',
+        'product_recommendation' => 'Kongsi satu tip atau discovery tentang {niche} yang genuinely helpful. Bukan iklan produk.',
+        'comparison' => 'Tulis perbandingan ringkas atau perspektif dua pendekatan dalam {niche}. Guna framing "aku dah try dua-dua".',
+        'productivity_tip' => 'Kongsi tip produktiviti tentang {niche}. Buat ia actionable dan relatable.',
+        'viral_hook' => 'Tulis hook yang buat orang stop scroll, diikuti insight bernilai tentang {niche}. Utamakan curiosity gap.',
+        'opinion' => 'Kongsi pendapat berani tentang {niche}. Jadi authentic — ajak perbincangan, bukan jualan.',
+        'list_post' => 'Buat post gaya "X benda" tentang {niche}. Pastikan setiap point ringkas dan bernilai.',
+        'wish_i_knew' => 'Tulis post "benda aku wish aku tahu awal-awal" tentang {niche}. Tutup dengan refleksi atau soalan.',
+        'general' => 'Buat content Threads yang engaging tentang {niche}. Utamakan value, storytelling, atau hot take — bukan promosi.',
+    ];
+
     /**
      * Build a complete prompt from configuration
      */
@@ -57,14 +70,17 @@ class PromptBuilder
         $tone = $requestedTone ?? $this->getRotatedTone();
         $style = $this->getRotatedStyle();
 
-        $systemPrompt = $this->buildSystemPrompt($tone, $style, $targetAudience);
-        $userPrompt = $this->buildUserPrompt($category, $niche, $affiliate, $ctaStyle);
+        $replyCount = $this->getRandomReplyCount();
+
+        $systemPrompt = $this->buildSystemPrompt($tone, $style, $targetAudience, $replyCount);
+        $userPrompt = $this->buildUserPrompt($category, $niche, $affiliate, $ctaStyle, $replyCount);
 
         return [
             'system' => $systemPrompt,
             'user' => $userPrompt,
             'tone_used' => $tone,
             'style_used' => $style,
+            'reply_count' => $replyCount,
         ];
     }
 
@@ -84,78 +100,139 @@ class PromptBuilder
         return $this->writingStyles[array_rand($this->writingStyles)];
     }
 
-    private function buildSystemPrompt(string $tone, string $style, string $audience): string
+    private function getRandomReplyCount(): int
+    {
+        return random_int(5, 7);
+    }
+
+    private function buildSystemPrompt(string $tone, string $style, string $audience, int $replyCount): string
     {
         // Add randomness to thread flow
         $flowVariations = [
-            'Sometimes buat Reply 3 lebih emotional daripada factual.',
-            'Kadang-kadang mula Reply 2 dengan soalan.',
-            'Boleh merge insight + example dalam satu reply kalau flow lebih natural.',
-            'Buat Reply 3 macam mini-story yang relatable.',
-            'Reply 4 boleh jadi hot take atau unpopular opinion.',
+            'Kadang thread stop awal kalau point dah kuat.',
+            'Boleh tambah extra reply kalau storytelling perlukan buildup.',
+            'Ada thread yang lebih pendek dan straight to the point.',
+            'Kadang Reply terakhir lebih reflective daripada CTA.',
+            'Boleh buat pacing slow untuk emotional topic.',
+            'Kadang thread rasa macam sembang random tapi connected.',
+            'Tak semua thread perlu hard closing.',
         ];
+
         $randomFlow = $flowVariations[array_rand($flowVariations)];
 
         return <<<PROMPT
-Kau seorang content creator untuk Threads (platform text-based Meta). Semua output WAJIB dalam Bahasa Malaysia sepenuhnya.
+        Kau seorang content creator untuk Threads (platform text-based Meta). Semua output WAJIB dalam Bahasa Malaysia sepenuhnya.
 
-Kau tulis THREAD (bukan single post). Setiap thread ada EXACTLY 5 replies yang connected sebagai satu cerita/idea.
+        Kau tulis THREAD (bukan single post). Setiap thread mesti rasa natural, connected, dan conversational.
 
-SUARA & GAYA:
-- Tone: {$tone}
-- Gaya penulisan: {$style}
-- Target audience: {$audience}
-- Platform: Threads (text-first, conversational, setiap reply pendek dan punchy)
+        PANJANG THREAD (GENERATION INI):
+        - Tulis TEPAT {$replyCount} replies untuk thread ini
+        - Range biasa: 5–7 replies (berbeza setiap generation)
+        - Pilih flow berdasarkan kesesuaian topik dalam {$replyCount} replies
+        - Jangan tambah atau kurangkan bilangan reply
 
-BAHASA:
-- Tulis SEPENUHNYA dalam Bahasa Malaysia
-- Guna bahasa santai ala Malaysian - campur sikit slang kalau sesuai (macam "korang", "memang", "legit", "best gila")
-- Jangan guna bahasa baku yang terlalu formal atau kaku
-- Boleh campur sikit English words yang memang orang Malaysia selalu guna (like "literally", "actually", "serious")
-- Jangan translate direct dari English - tulis macam orang Malaysia betul-betul cakap
+        SUARA & GAYA:
+        - Tone: {$tone}
+        - Gaya penulisan: {$style}
+        - Target audience: {$audience}
+        - Platform: Threads (text-first, conversational, setiap reply pendek dan punchy)
 
-STRUKTUR THREAD (WAJIB IKUT):
-Reply 1 (HOOK): Pendek, grab attention (20-30 patah perkataan sahaja). Buat curiosity atau emotional trigger. JANGAN explain lagi.
-Reply 2 (ELABORATION): Expand idea dari Reply 1 (20-30 patah perkataan). Explain context, insight, atau masalah. Keep natural.
-Reply 3 (EXAMPLE/STORY/SCENARIO): Bagi real-life example atau situasi relatable (20-30 patah perkataan). Storytelling style, bukan bullet points.
-Reply 4 (INSIGHT/VALUE SUMMARY): Summarize key takeaway atau opinion (20-30 patah perkataan). Personal take, lesson, atau realization. Punchy atau reflective.
-Reply 5 (CTA/CLOSING): Soft atau direct CTA (20-30 patah perkataan). Kalau ada produk, WAJIB mention kat sini dengan [link]. End dengan engagement hook (soalan/opinion/challenge).
+        BAHASA:
+        - Tulis SEPENUHNYA dalam Bahasa Malaysia
+        - Guna bahasa santai ala Malaysian — natural tapi EJAAN BETUL (tiada typo)
+        - WAJIB eja perkataan dengan betul: "biasa", "dengan", "riang", "kecil", "special" — JANGAN salah huruf macam "bdiasa", "ngan rdiang", "specdial", "kecik" melainkan perkataan itu memang slang standard (contoh: "je", "dah", "tak", "nak")
+        - Boleh guna perkataan santai standard: "korang", "aku", "memang", "best gila", "seriously", "legit"
+        - Jangan guna bahasa baku berlebihan atau ayat kaku macam essay
+        - Boleh masukkan English words yang orang Malaysia memang guna (literally, actually) — jangan direct translate dari English
+        - Semak semula setiap reply: tiada missing letter, tiada random typo, grammar masih natural
 
-PERATURAN KETAT:
-1. Tulis macam orang biasa share pemikiran genuine, BUKAN macam marketer
-2. Jangan guna frasa AI yang obvious: "game-changer", "dive into", "unlock", "leverage", "dalam dunia hari ini", "perlu diingatkan"
-3. Jangan mula dengan "Saya" - vary pembukaan ayat
-4. Guna ayat tak lengkap, grammar santai, dan corak percakapan natural
-5. Setiap reply MESTI pendek (Threads-native readability)
-6. Seluruh thread mesti rasa macam SATU cerita connected
-7. JANGAN ulang idea yang sama across replies
-8. Hook (Reply 1) JANGAN mention produk directly
-9. CTA (Reply 5) adalah SATU-SATUNYA tempat link dibenarkan
-10. EXACTLY 5 replies - tak lebih, tak kurang
-11. JANGAN guna hashtag langsung
-12. Bunyi macam kau tengah text kawan rapat, bukan tulis blog post
+        FLOW THREAD:
+        Reply 1:
+        - WAJIB jadi hook
+        - Pendek dan grab attention
+        - Buat curiosity, emotional trigger, atau relatable thought
+        - JANGAN explain semua terus
+        - Sekitar 20-40 patah perkataan
 
-VARIASI FLOW: {$randomFlow}
+        Middle Replies:
+        - Expand idea slowly
+        - Boleh mix:
+        • elaboration
+        • personal observation
+        • relatable situation
+        • mini-story
+        • emotional reflection
+        • hot take
+        • realization
+        - Tak perlu ikut format rigid
+        - Biarkan flow rasa natural macam orang tengah bercakap
 
-ANTI-REPETITION:
-- Jangan ulang hook dari generation sebelum
-- Vary panjang ayat (campur pendek punchy dengan sederhana)
-- Rotate antara first person, second person, dan observational framing
-PROMPT;
+        Last Reply:
+        - Boleh jadi CTA
+        - Boleh jadi reflective ending
+        - Boleh jadi open-ended question
+        - Boleh jadi strong final thought
+        - Kalau ada produk/link, WAJIB mention hanya di last reply menggunakan [link]
+
+        PERATURAN KETAT:
+        1. Tulis macam orang biasa share pemikiran genuine, BUKAN macam marketer
+        2. Jangan guna frasa AI yang obvious:
+        - "game-changer"
+        - "dive into"
+        - "unlock"
+        - "leverage"
+        - "dalam dunia hari ini"
+        - "perlu diingatkan"
+        3. Jangan mula semua ayat dengan pattern sama
+        4. Grammar santai dan natural — BUKAN salah ejaan
+        5. Setiap reply pendek dan senang baca
+        6. Seluruh thread mesti rasa connected
+        7. Jangan ulang point yang sama
+        8. Hook jangan mention produk terus
+        9. Link hanya dibenarkan pada reply terakhir
+        10. JANGAN guna hashtag langsung
+        11. Bunyi macam tengah text/member sembang, bukan blog post
+        12. Natural dan imperfect dalam flow/idea — bukan dalam spelling
+
+        VARIASI FLOW:
+        {$randomFlow}
+
+        ANTI-REPETITION:
+        - Jangan ulang hook dari generation sebelum
+        - Rotate antara:
+        • emotional opening
+        • observation
+        • controversial thought
+        • question-based hook
+        • mini-story opening
+        - Vary panjang ayat
+        - Campur short punchy line dengan ayat slightly panjang
+        - Boleh lowercase pada hook untuk vibe casual — tetap ejaan betul
+
+        OUTPUT FORMAT:
+        - Label setiap bahagian sebagai:
+        Reply 1:
+        Reply 2:
+        dan seterusnya
+        - Jangan tambah explanation luar thread
+        PROMPT;
     }
 
-    private function buildUserPrompt(string $category, ?Niche $niche, ?AffiliateLink $affiliate, string $ctaStyle): string
+    private function buildUserPrompt(string $category, ?Niche $niche, ?AffiliateLink $affiliate, string $ctaStyle, int $replyCount): string
     {
         $nicheName = $niche?->name ?? 'general';
         $productName = $affiliate?->product_name ?? '';
         $nicheKeywords = $niche?->keywords ? implode(', ', $niche->keywords) : '';
 
-        // Get category template
-        $template = $this->categoryTemplates[$category] ?? $this->categoryTemplates['general'];
-        $template = str_replace('{product}', $productName, $template);
-        $template = str_replace('{niche}', $nicheName, $template);
+        $isAffiliatePost = $productName !== '';
 
-        $ctaInstruction = $this->getCTAInstruction($ctaStyle);
+        if ($isAffiliatePost) {
+            $template = $this->categoryTemplates[$category] ?? $this->categoryTemplates['general'];
+            $template = str_replace('{product}', $productName, $template);
+        } else {
+            $template = $this->sharingCategoryTemplates[$category] ?? $this->sharingCategoryTemplates['general'];
+        }
+        $template = str_replace('{niche}', $nicheName, $template);
 
         $prompt = "TASK: {$template}\n\n";
         $prompt .= "NICHE: {$nicheName}\n";
@@ -164,21 +241,63 @@ PROMPT;
             $prompt .= "KEYWORDS TO CONSIDER: {$nicheKeywords}\n";
         }
 
-        if ($productName) {
+        if ($isAffiliatePost) {
+            $ctaInstruction = $this->getCTAInstruction($ctaStyle);
             $prompt .= "PRODUCT: {$productName}\n";
             $prompt .= "CTA STYLE: {$ctaInstruction}\n";
+            $prompt .= "LAST REPLY: letak placeholder [link] di mana URL patut masuk (sistem akan ganti dengan URL sebenar semasa publish).\n";
+        } else {
+            $prompt .= "MODE: Kongsi / sharing sahaja — JANGAN letak [link], URL, atau CTA jualan.\n";
+            $prompt .= "LAST REPLY: tutup dengan soalan, refleksi, atau ajak komen — bukan link atau produk.\n";
         }
 
         $prompt .= "\nFORMAT OUTPUT (WAJIB IKUT EXACTLY):\n";
-        $prompt .= "Reply 1:\n[hook content]\n\n";
-        $prompt .= "Reply 2:\n[elaboration content]\n\n";
-        $prompt .= "Reply 3:\n[example/story content]\n\n";
-        $prompt .= "Reply 4:\n[insight/value content]\n\n";
-        $prompt .= "Reply 5:\n[cta/closing content]\n\n";
-        $prompt .= "Tulis sepenuhnya dalam Bahasa Malaysia (santai, natural, macam orang Malaysia cakap).\n";
-        $prompt .= "JANGAN tambah apa-apa text lain selain format di atas. EXACTLY 5 replies.";
+        $prompt .= $this->buildReplyFormatSection($replyCount);
+        $prompt .= "Tulis sepenuhnya dalam Bahasa Malaysia (santai, natural, ejaan betul, tanpa typo).\n";
+        $prompt .= "JANGAN tambah apa-apa text lain selain format di atas. EXACTLY {$replyCount} replies.\n";
+        $prompt .= "Final check: setiap perkataan mesti dibaca dengan lancar — reject output yang ada typo random.\n";
 
         return $prompt;
+    }
+
+    private function buildReplyFormatSection(int $replyCount): string
+    {
+        $hintsByCount = [
+            5 => [
+                1 => '[hook content]',
+                2 => '[elaboration content]',
+                3 => '[example/story content]',
+                4 => '[insight/value content]',
+                5 => '[cta/closing content]',
+            ],
+            6 => [
+                1 => '[hook content]',
+                2 => '[elaboration content]',
+                3 => '[example/story content]',
+                4 => '[insight/value content]',
+                5 => '[buildup or emotional beat]',
+                6 => '[cta/closing content]',
+            ],
+            7 => [
+                1 => '[hook content]',
+                2 => '[elaboration content]',
+                3 => '[example/story content]',
+                4 => '[personal observation or relatable moment]',
+                5 => '[hot take or emotional reflection]',
+                6 => '[insight/value content]',
+                7 => '[cta/closing content]',
+            ],
+        ];
+
+        $hints = $hintsByCount[$replyCount] ?? $hintsByCount[5];
+        $section = '';
+
+        for ($i = 1; $i <= $replyCount; $i++) {
+            $hint = $hints[$i] ?? '[thread content]';
+            $section .= "Reply {$i}:\n{$hint}\n\n";
+        }
+
+        return $section;
     }
 
     private function getCTAInstruction(string $style): string

@@ -30,18 +30,11 @@ class ContentGenerator
 
     public function __construct()
     {
-        $guzzleOptions = [
+        $this->httpClient = new Client([
             'base_uri' => 'https://api.openai.com/v1/',
             'timeout' => 30,
-        ];
-
-        // Use a CA bundle for SSL verification on Windows/WAMP environments
-        $caBundle = dirname(__DIR__, 3) . '/cacert.pem';
-        if (file_exists($caBundle)) {
-            $guzzleOptions['verify'] = $caBundle;
-        }
-
-        $this->httpClient = new Client($guzzleOptions);
+            'verify' => guzzle_ssl_verify(),
+        ]);
         $this->promptBuilder = new PromptBuilder();
         $this->humanizer = new Humanizer();
         $this->scorer = new QualityScorer();

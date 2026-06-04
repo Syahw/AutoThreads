@@ -1,0 +1,19 @@
+import clsx from 'clsx';
+
+const styles = {
+  draft: 'badge-draft',
+  approved: 'badge-approved',
+  posted: 'badge-posted',
+  rejected: 'badge-rejected',
+  scheduled: 'badge-scheduled',
+  queued: 'badge-scheduled',
+  processing: 'badge bg-brand-50 text-brand-700 ring-1 ring-brand-600/10 dark:bg-brand-950/50 dark:text-brand-300',
+};
+
+export default function StatusBadge({ status }) {
+  return (
+    <span className={clsx(styles[status] || 'badge-draft', 'capitalize')}>
+      {status}
+    </span>
+  );
+}

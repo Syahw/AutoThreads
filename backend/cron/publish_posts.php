@@ -2,14 +2,11 @@
 
 /**
  * Cron Job: Publish Scheduled Posts
- * 
- * Run every minute via crontab:
- * * * * * * php /path/to/backend/cron/publish_posts.php >> /path/to/storage/logs/cron.log 2>&1
- * 
- * This script:
- * 1. Finds posts that are due for publishing
- * 2. Publishes them via Threads API
- * 3. Logs results and handles retries
+ *
+ * Run every minute via Task Scheduler (Windows) or crontab (Linux):
+ *   backend/cron/run_publish.bat
+ *
+ * Logs: backend/storage/logs/cron-publish.log
  */
 
 declare(strict_types=1);
@@ -17,99 +14,53 @@ declare(strict_types=1);
 require __DIR__ . '/../vendor/autoload.php';
 
 use AutoThreads\Config\Bootstrap;
-use AutoThreads\Models\ScheduledPost;
-use AutoThreads\Models\PostingLog;
-use AutoThreads\Services\Threads\ThreadsClient;
+use AutoThreads\Services\Scheduler\CronLogger;
+use AutoThreads\Services\Scheduler\CronPublishWorker;
 use AutoThreads\Services\Scheduler\PostScheduler;
+use Carbon\Carbon;
 
-// Load environment
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
-// Bootstrap
-$container = Bootstrap::init();
-$logger = $container->get('logger');
+Bootstrap::init();
 
-$logger->info('Cron: publish_posts started');
-
+$cronLog = new CronLogger();
 $scheduler = new PostScheduler();
-$threadsClient = new ThreadsClient();
+$worker = new CronPublishWorker($scheduler);
 
-// Get due posts
-$duePosts = $scheduler->getDuePosts();
+$cronLog->line('=== publish_posts started ===');
+$cronLog->line('PHP: ' . PHP_VERSION . ' · SAPI: ' . PHP_SAPI);
+$cronLog->line('Timezone: ' . date_default_timezone_get());
+$cronLog->line('Now: ' . Carbon::now($scheduler->getTimezone())->format('Y-m-d H:i:s'));
 
-if ($duePosts->isEmpty()) {
-    $logger->info('Cron: No posts due for publishing');
-    exit(0);
-}
+try {
+    $summary = $worker->processDuePosts();
 
-$logger->info("Cron: Found {$duePosts->count()} posts to publish");
+    $cronLog->line(sprintf(
+        'Done: processed=%d published=%d failed=%d',
+        $summary['processed'],
+        $summary['published'],
+        $summary['failed']
+    ));
 
-foreach ($duePosts as $scheduledPost) {
-    $startTime = microtime(true);
-
-    try {
-        // Mark as processing
-        $scheduledPost->status = 'processing';
-        $scheduledPost->save();
-
-        $content = $scheduledPost->generatedPost->content;
-        $account = $scheduledPost->threadsAccount;
-
-        // Publish to Threads
-        $result = $threadsClient->publishPost($account, $content);
-        $responseTime = (int) ((microtime(true) - $startTime) * 1000);
-
-        // Success
-        $scheduledPost->status = 'posted';
-        $scheduledPost->posted_at = now();
-        $scheduledPost->threads_post_id = $result['id'] ?? null;
-        $scheduledPost->save();
-
-        // Update generated post status
-        $scheduledPost->generatedPost->status = 'posted';
-        $scheduledPost->generatedPost->save();
-
-        // Log success
-        PostingLog::create([
-            'user_id' => $scheduledPost->user_id,
-            'scheduled_post_id' => $scheduledPost->id,
-            'threads_account_id' => $account->id,
-            'action' => 'post',
-            'status' => 'success',
-            'threads_post_id' => $result['id'] ?? null,
-            'response_time_ms' => $responseTime,
-        ]);
-
-        $logger->info("Published post #{$scheduledPost->id} successfully");
-
-    } catch (\GuzzleHttp\Exception\ClientException $e) {
-        $responseTime = (int) ((microtime(true) - $startTime) * 1000);
-        $statusCode = $e->getResponse()->getStatusCode();
-        $errorBody = $e->getResponse()->getBody()->getContents();
-
-        $status = $statusCode === 429 ? 'rate_limited' : 'failed';
-
-        PostingLog::create([
-            'user_id' => $scheduledPost->user_id,
-            'scheduled_post_id' => $scheduledPost->id,
-            'threads_account_id' => $scheduledPost->threads_account_id,
-            'action' => $scheduledPost->retry_count > 0 ? 'retry' : 'post',
-            'status' => $status,
-            'error_message' => $errorBody,
-            'response_time_ms' => $responseTime,
-        ]);
-
-        $scheduler->markForRetry($scheduledPost, $errorBody);
-        $logger->warning("Failed to publish post #{$scheduledPost->id}: {$errorBody}");
-
-    } catch (\Exception $e) {
-        $scheduler->markForRetry($scheduledPost, $e->getMessage());
-        $logger->error("Error publishing post #{$scheduledPost->id}: {$e->getMessage()}");
+    foreach ($summary['details'] as $detail) {
+        $cronLog->line(sprintf(
+            '  #%s @ %s → %s: %s',
+            $detail['scheduled_post_id'],
+            $detail['scheduled_at'] ?? '?',
+            $detail['status'],
+            mb_substr($detail['message'] ?? '', 0, 200)
+        ));
     }
 
-    // Rate limit: wait between posts
-    sleep(3);
+    if ($summary['processed'] === 0) {
+        $cronLog->line('No posts were due (queued with scheduled_at <= now).');
+    }
+} catch (\Throwable $e) {
+    $cronLog->line('FATAL: ' . $e->getMessage());
+    $cronLog->line($e->getFile() . ':' . $e->getLine());
+    exit(1);
 }
 
-$logger->info('Cron: publish_posts completed');
+$cronLog->line('=== publish_posts completed ===');
+exit(0);

@@ -7,7 +7,7 @@ namespace AutoThreads\Services\AI;
  * 
  * Strategies:
  * - Remove common AI patterns
- * - Add natural imperfections
+ * - Casual tone without mangled spelling
  * - Extract hook/CTA structure
  * - Ensure platform-native formatting
  */
@@ -47,12 +47,12 @@ class Humanizer
         'effortlessly' => 'easily',
         'streamline' => 'simplify',
     
-        // BM formal -> casual
+        // BM formal -> casual (keep correct spelling)
         'dalam dunia hari ini' => 'sekarang ni',
         'perlu diingatkan' => '',
         'tidak dapat dinafikan' => 'memang',
         'sesungguhnya' => 'seriously',
-        'adalah penting untuk' => 'kena',
+        'adalah penting untuk' => 'penting',
         'di samping itu' => 'lagi satu',
         'sehubungan dengan itu' => '',
         'tambahan pula' => 'lagi',
@@ -60,93 +60,39 @@ class Humanizer
         'pada hakikatnya' => 'sebenarnya',
         'walau bagaimanapun' => 'tapi',
         'kesimpulannya' => '',
-    
-        // More natural Malaysian casual speech
-        'kecil' => 'kecik',
-        'besar' => 'besaq',
-        'sedikit' => 'sikit',
-        'sebentar' => 'kejap',
-        'sahaja' => 'je',
-        'juga' => 'jugak',
-        'begitu' => 'camtu',
-        'macam itu' => 'camtu',
-        'seperti itu' => 'camtu',
-        'bagaimana' => 'macam mana',
-        'mengapa' => 'kenapa',
-        'kenapakah' => 'kenapa',
-        'tidak' => 'tak',
-        'hendak' => 'nak',
-        'mahu' => 'nak',
-        'ingin' => 'nak',
-        'sangat' => 'gila',
-        'amat' => 'gila',
-        'memang sangat' => 'serius',
-        'penat' => 'letih gila',
-        'marah' => 'geram',
-        'lucu' => 'kelakar',
-        'kelihatan' => 'nampak',
-        'melihat' => 'tengok',
-        'perkara' => 'benda',
-        'masalah' => 'hal',
-        'berfikir' => 'fikir',
-        'memberitahu' => 'bagitau',
-        'memberikan' => 'bagi',
-        'menggunakan' => 'guna',
-        'membeli' => 'beli',
-        'mencuba' => 'try',
-        'mencubanya' => 'try je',
-        'memerlukan' => 'perlukan',
-        'memudahkan' => 'senangkan',
-        'memang benar' => 'legit',
-        'sungguh' => 'seriously',
-        'terbaik' => 'padu',
-        'hebat' => 'power',
-        'bagus' => 'solid',
-        'baik' => 'nice',
-        'sukar' => 'payah',
-        'mudah' => 'senang',
-        'cepat' => 'laju',
-        'perlahan' => 'slow',
-        'berbaloi' => 'worth',
-        'tidak boleh' => 'tak boleh',
-        'tidak dapat' => 'tak dapat',
-        'bolehkah' => 'boleh ke',
-        'adakah' => '',
         'saya rasa' => 'aku rasa',
         'saya fikir' => 'aku rasa',
         'saya telah' => 'aku dah',
         'aku telah' => 'aku dah',
-        'sudah' => 'dah',
-        'telah' => 'dah',
-        'belum' => 'lom',
-        'akan' => 'nak',
-        'kepada' => 'kat',
-        'dengan' => 'ngan',
-        'bukan sahaja' => 'bukan je',
-        'kedua-duanya' => 'dua dua sekali',
-        'semuanya' => 'semua sekali',
-        'ramai orang' => 'ramai gila orang',
-        'setiap hari' => 'hari hari',
-        'kadangkala' => 'kadang kadang',
-        'terlalu' => 'terlampau',
-        'benar-benar' => 'betul betul',
-        'masih lagi' => 'still',
+        'tidak boleh' => 'tak boleh',
+        'tidak dapat' => 'tak dapat',
         'langsung tidak' => 'langsung tak',
-        'sungguh-sungguh' => 'betul betul',
-        'secara automatik' => 'auto',
-        'telefon bimbit' => 'phone',
-        'aplikasi' => 'app',
-        'gambar' => 'pic',
-        'video pendek' => 'short video',
-        'media sosial' => 'social media',
-    
-        // More conversational replacements
+        'bukan sahaja' => 'bukan je',
+        'kadangkala' => 'kadang-kadang',
+        'memberitahu' => 'bagitau',
+        'menggunakan' => 'guna',
+        'mencuba' => 'cuba',
+        'kelihatan' => 'nampak',
+        'melihat' => 'tengok',
+        'bagaimana' => 'macam mana',
+        'mengapa' => 'kenapa',
         'saya' => 'aku',
         'anda' => 'korang',
         'awak' => 'korang',
         'kamu' => 'korang',
         'mereka' => 'diorang',
-        'dia' => 'dia je',
+        'tidak' => 'tak',
+        'hendak' => 'nak',
+        'mahu' => 'nak',
+        'ingin' => 'nak',
+        'sudah' => 'dah',
+        'telah' => 'dah',
+        'kepada' => 'ke',
+        'sahaja' => 'je',
+        'juga' => 'jugak',
+        'sedikit' => 'sikit',
+        'sebentar' => 'kejap',
+        'perkara' => 'benda',
     ];
    
     public function process(string $rawContent): array
@@ -159,6 +105,7 @@ class Humanizer
             $processedReplies = [];
             foreach ($replies as $i => $reply) {
                 $processed = $this->removeAIPhrases($reply);
+                $processed = $this->fixCommonTypos($processed);
                 $processed = $this->casualizePunctuation($processed);
                 $processed = trim($processed);
                 $processedReplies[$i] = $processed;
@@ -166,7 +113,7 @@ class Humanizer
 
             // Extract components from thread structure
             $hook = $processedReplies[0] ?? '';
-            $cta = $processedReplies[4] ?? '';
+            $cta = $processedReplies[array_key_last($processedReplies)] ?? '';
 
             // Rebuild full content with Reply markers
             $fullContent = '';
@@ -187,6 +134,7 @@ class Humanizer
         // Fallback: single post format (backward compatibility)
         $content = $rawContent;
         $content = $this->removeAIPhrases($content);
+        $content = $this->fixCommonTypos($content);
         $content = $this->casualizePunctuation($content);
         $content = $this->enforceLength($content, 500);
 
@@ -208,7 +156,7 @@ class Humanizer
      * Parse thread replies from AI output
      * Splits content by "Reply X:" markers
      */
-    private function parseThreadReplies(string $content): array
+    public function parseThreadReplies(string $content): array
     {
         $replies = [];
         // Split by "Reply N:" pattern (case-insensitive)
@@ -224,9 +172,42 @@ class Humanizer
         return $replies;
     }
 
+    /**
+     * Fix common AI/humanizer typos while keeping casual tone.
+     */
+    private function fixCommonTypos(string $content): string
+    {
+        $fixes = [
+            'bdiasa' => 'biasa',
+            'specdial' => 'special',
+            'rdiang' => 'riang',
+            ' ngan ' => ' dengan ',
+            ' ngon ' => ' dengan ',
+            'kecik' => 'kecil',
+            'besaq' => 'besar',
+            'benda kecik' => 'benda kecil',
+            'terlampau' => 'terlalu',
+            'lom ' => 'belum ',
+            ' camtu' => ' macam tu',
+        ];
+
+        foreach ($fixes as $wrong => $right) {
+            $content = str_ireplace($wrong, $right, $content);
+        }
+
+        return $content;
+    }
+
     private function removeAIPhrases(string $content): string
     {
-        foreach ($this->replacements as $phrase => $replacement) {
+        // Longer phrases first to avoid partial replacements
+        $replacements = $this->replacements;
+        uksort($replacements, fn ($a, $b) => strlen($b) <=> strlen($a));
+
+        foreach ($replacements as $phrase => $replacement) {
+            if ($phrase === '') {
+                continue;
+            }
             $content = str_ireplace($phrase, $replacement, $content);
         }
 

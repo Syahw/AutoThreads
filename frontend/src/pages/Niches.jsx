@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { Plus, Tag } from 'lucide-react';
+import PageHeader from '../components/ui/PageHeader';
+import EmptyState from '../components/ui/EmptyState';
 
 export default function Niches() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', target_audience: '' });
 
-  const { data: niches } = useQuery({
+  const { data: niches, isLoading } = useQuery({
     queryKey: ['niches'],
     queryFn: () => api.get('/niches').then((r) => r.data.data),
   });
@@ -24,59 +26,71 @@ export default function Niches() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Niches</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Plus size={16} /> Add Niche
-        </button>
-      </div>
+      <PageHeader
+        title="Niches"
+        description="Organize content by topic and target audience for better AI prompts."
+        action={
+          <button type="button" onClick={() => setShowForm(!showForm)} className="btn-primary">
+            <Plus size={16} /> Add niche
+          </button>
+        }
+      />
 
       {showForm && (
-        <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="card mb-6 p-6">
+          <h2 className="text-heading mb-4 text-lg font-semibold">New niche</h2>
+          <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
             <input
               placeholder="Niche name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg"
+              className="input-field"
             />
             <input
               placeholder="Description"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg"
+              className="input-field"
             />
             <input
               placeholder="Target audience"
               value={form.target_audience}
               onChange={(e) => setForm({ ...form, target_audience: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg"
+              className="input-field"
             />
           </div>
-          <button
-            onClick={() => createMutation.mutate(form)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Create Niche
+          <button type="button" onClick={() => createMutation.mutate(form)} className="btn-success">
+            Create niche
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {niches?.map((niche) => (
-          <div key={niche.id} className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <Tag size={16} className="text-blue-500" />
-              <h3 className="font-semibold text-gray-900">{niche.name}</h3>
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card skeleton h-32" />
+          ))}
+        </div>
+      ) : niches?.length === 0 ? (
+        <div className="card">
+          <EmptyState icon={Tag} title="No niches yet" description="Create a niche to tailor generated content." />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {niches.map((niche) => (
+            <div key={niche.id} className="card-hover p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                  <Tag size={16} />
+                </div>
+                <h3 className="text-heading font-semibold">{niche.name}</h3>
+              </div>
+              <p className="text-muted line-clamp-2 text-sm">{niche.description || 'No description'}</p>
+              <p className="mt-3 text-xs font-medium text-slate-400 dark:text-slate-500">{niche.post_count ?? 0} posts</p>
             </div>
-            <p className="text-sm text-gray-500 mb-2">{niche.description || 'No description'}</p>
-            <p className="text-xs text-gray-400">Posts: {niche.post_count}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

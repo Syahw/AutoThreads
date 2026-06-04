@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import {
   LayoutDashboard, Sparkles, Calendar, Tag,
-  Link2, BarChart3, Settings, LogOut, Menu, X,
+  Link2, BarChart3, Settings, LogOut, Menu, X, Zap,
 } from 'lucide-react';
 import clsx from 'clsx';
+import ThemeToggle from './ThemeToggle';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -17,42 +18,62 @@ const navItems = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
+const pageTitles = {
+  '/': 'Dashboard',
+  '/content': 'Content Generator',
+  '/scheduler': 'Scheduler',
+  '/niches': 'Niches',
+  '/affiliates': 'Affiliate Links',
+  '/analytics': 'Analytics',
+  '/settings': 'Settings',
+};
+
 export default function Layout() {
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+  const pageTitle = pageTitles[location.pathname] || 'AutoThreads';
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Mobile overlay */}
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-200 ease-in-out lg:static lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col bg-sidebar-gradient border-r border-slate-800/50 transition-transform duration-300 ease-out lg:static lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">AutoThreads</h1>
-            <p className="text-sm text-gray-500 mt-1">AI Content Automation</p>
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 px-5 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-gradient shadow-glow">
+              <Zap size={20} className="text-white" fill="currentColor" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-white">AutoThreads</h1>
+              <p className="text-xs text-slate-400">AI · Threads · Affiliate</p>
+            </div>
           </div>
           <button
+            type="button"
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1 text-gray-500 hover:text-gray-700"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
             aria-label="Close sidebar"
           >
             <X size={20} />
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto" aria-label="Main navigation">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Main navigation">
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Menu
+          </p>
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
@@ -61,57 +82,82 @@ export default function Layout() {
               onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
                 clsx(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-white/10 text-white shadow-inner'
+                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'
                 )
               }
             >
-              <Icon size={18} />
-              {label}
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-brand-gradient" />
+                  )}
+                  <span
+                    className={clsx(
+                      'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                      isActive ? 'bg-brand-500/20 text-brand-300' : 'bg-slate-800/50 text-slate-400 group-hover:text-slate-200'
+                    )}
+                  >
+                    <Icon size={18} />
+                  </span>
+                  {label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-gray-100">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-blue-700">
-                {user?.name?.[0]?.toUpperCase()}
-              </span>
+        <div className="border-t border-slate-800/80 p-4">
+          <div className="rounded-xl bg-slate-800/40 p-3 ring-1 ring-slate-700/50">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-sm font-bold text-white">
+                {user?.name?.[0]?.toUpperCase() ?? '?'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-white">{user?.name}</p>
+                <p className="truncate text-xs capitalize text-slate-400">{user?.plan ?? 'free'} plan</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-              <p className="text-xs text-gray-500 truncate">{user?.plan} plan</p>
-            </div>
+            <button
+              type="button"
+              onClick={logout}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-700/50 hover:text-red-300"
+            >
+              <LogOut size={14} />
+              Sign out
+            </button>
           </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 transition-colors"
-          >
-            <LogOut size={16} />
-            Sign out
-          </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-3 p-4 bg-white border-b border-gray-200">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80 sm:px-6 lg:px-8">
           <button
+            type="button"
             onClick={() => setSidebarOpen(true)}
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+            className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 lg:hidden"
             aria-label="Open sidebar"
           >
             <Menu size={20} />
           </button>
-          <h1 className="text-lg font-bold text-gray-900">AutoThreads</h1>
+          <div className="flex-1 min-w-0">
+            <p className="hidden text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500 sm:block">
+              Workspace
+            </p>
+            <h2 className="truncate text-lg font-bold text-slate-900 dark:text-slate-50 sm:text-xl">{pageTitle}</h2>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ThemeToggle compact />
+            <span className="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/10 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-500/20 sm:inline">
+              System online
+            </span>
+          </div>
         </header>
 
-        <main className="flex-1 overflow-auto">
-          <div className="p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-auto bg-mesh dark:bg-mesh-dark">
+          <div className="page-shell p-4 sm:p-6 lg:p-8">
             <Outlet />
           </div>
         </main>

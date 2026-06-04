@@ -1,14 +1,178 @@
-import { Settings as SettingsIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '../services/api';
+import { Link2, Loader2, CheckCircle2, AlertCircle, Unplug, Shield } from 'lucide-react';
+import PageHeader from '../components/ui/PageHeader';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function Settings() {
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [banner, setBanner] = useState(null);
+  const [connecting, setConnecting] = useState(false);
+
+  const { data: accounts, isLoading } = useQuery({
+    queryKey: ['threads-accounts'],
+    queryFn: () => api.get('/threads/accounts').then((r) => r.data.data),
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: (id) => api.delete(`/threads/accounts/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['threads-accounts'] }),
+  });
+
+  useEffect(() => {
+    const status = searchParams.get('threads');
+    if (!status) return;
+
+    if (status === 'connected' || status === 'connected_missing_scopes') {
+      const username = searchParams.get('username');
+      if (status === 'connected_missing_scopes') {
+        setBanner({
+          type: 'error',
+          text: searchParams.get('message')
+            || 'Connected, but threads_manage_replies was not granted. Reconnect after adding it in Meta.',
+        });
+      } else {
+        setBanner({
+          type: 'success',
+          text: username
+            ? `Threads @${username} connected successfully.`
+            : 'Threads account connected successfully.',
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['threads-accounts'] });
+    } else if (status === 'error') {
+      setBanner({
+        type: 'error',
+        text: searchParams.get('message') || 'Threads connection failed.',
+      });
+    }
+
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams, queryClient]);
+
+  const handleConnect = async () => {
+    setConnecting(true);
+    setBanner(null);
+    try {
+      const { data } = await api.get('/threads/connect');
+      const authUrl = data?.data?.auth_url;
+      if (!authUrl) throw new Error('No authorization URL returned');
+      window.location.href = authUrl;
+    } catch (err) {
+      setBanner({
+        type: 'error',
+        text: err.response?.data?.message || err.message || 'Could not start Threads connect',
+      });
+      setConnecting(false);
+    }
+  };
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
-      <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-        <div className="text-center py-8">
-          <SettingsIcon size={48} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500">Settings panel</p>
-          <p className="text-sm text-gray-400 mt-1">Manage API keys, scheduling preferences, and account settings</p>
+      <PageHeader
+        title="Settings"
+        description="Connect Threads, manage OAuth permissions, and configure your publishing setup."
+      />
+
+      {banner && (
+        <div
+          className={`mb-6 flex items-start gap-3 ${
+            banner.type === 'success' ? 'alert-success' : 'alert-error'
+          }`}
+        >
+          {banner.type === 'success' ? (
+            <CheckCircle2 size={20} className="shrink-0" />
+          ) : (
+            <AlertCircle size={20} className="shrink-0" />
+          )}
+          <span>{banner.text}</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="card p-6">
+          <h2 className="text-heading mb-1 text-lg font-semibold">Appearance</h2>
+          <p className="text-muted mb-4 text-sm">Choose light, dark, or match your system theme.</p>
+          <ThemeToggle />
+        </div>
+
+        <div className="card lg:col-span-2 p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="icon-box">
+              <Link2 size={20} />
+            </div>
+            <div>
+              <h2 className="text-heading text-lg font-semibold">Threads account</h2>
+              <p className="text-muted text-sm">Required for publishing reply chains</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <p className="text-muted flex items-center gap-2 text-sm">
+              <Loader2 size={16} className="animate-spin" /> Loading accounts...
+            </p>
+          ) : accounts?.length > 0 ? (
+            <div className="mb-5 space-y-3">
+              {accounts.map((account) => (
+                <div
+                  key={account.id}
+                  className="panel-muted p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-heading font-semibold">@{account.username}</p>
+                      <p className="text-muted mt-1 text-xs">
+                        Connected {account.connected_at ? new Date(account.connected_at).toLocaleString() : '—'}
+                      </p>
+                      <p
+                        className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          account.can_publish_reply_chain
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
+                        }`}
+                      >
+                        {account.can_publish_reply_chain ? 'Reply chains ready' : 'Missing manage_replies'}
+                      </p>
+                      {account.token_scopes?.length > 0 && (
+                        <p className="mt-2 break-words text-xs text-slate-400 dark:text-slate-500">
+                          {account.token_scopes.join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => disconnectMutation.mutate(account.id)}
+                      disabled={disconnectMutation.isPending}
+                      className="btn-danger !py-2 !text-xs"
+                    >
+                      <Unplug size={14} /> Disconnect
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted mb-5 text-sm">No Threads account connected yet.</p>
+          )}
+
+          <button type="button" onClick={handleConnect} disabled={connecting} className="btn-primary">
+            {connecting ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />}
+            {connecting ? 'Redirecting to Meta...' : accounts?.length ? 'Reconnect Threads' : 'Connect Threads'}
+          </button>
+        </div>
+
+        <div className="card p-6">
+          <div className="icon-box-muted mb-4">
+            <Shield size={20} />
+          </div>
+          <h3 className="text-heading font-semibold">Local dev (HTTPS)</h3>
+          <p className="text-muted mt-2 text-sm">
+            Meta requires <code className="code-inline">https://</code> redirect URIs.
+            Use ngrok for WAMP and add the callback URL in Meta OAuth settings.
+          </p>
         </div>
       </div>
     </div>

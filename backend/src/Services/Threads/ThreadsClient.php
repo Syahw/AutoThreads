@@ -3,6 +3,7 @@
 namespace AutoThreads\Services\Threads;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use AutoThreads\Models\ThreadsAccount;
 
 /**
@@ -29,7 +30,11 @@ class ThreadsClient
     {
         $this->apiVersion = $_ENV['THREADS_API_VERSION'] ?? 'v1.0';
         $this->baseUrl = "https://graph.threads.net/{$this->apiVersion}";
-        $this->http = new Client(['timeout' => 30]);
+
+        $this->http = new Client([
+            'timeout' => 30,
+            'verify' => guzzle_ssl_verify(),
+        ]);
     }
 
     /**
@@ -40,7 +45,7 @@ class ThreadsClient
         $params = http_build_query([
             'client_id' => $_ENV['THREADS_APP_ID'],
             'redirect_uri' => $_ENV['THREADS_REDIRECT_URI'],
-            'scope' => 'threads_basic,threads_content_publish,threads_manage_insights',
+            'scope' => 'threads_basic,threads_content_publish,threads_manage_replies,threads_manage_insights',
             'response_type' => 'code',
             'state' => $state,
         ]);
@@ -49,7 +54,7 @@ class ThreadsClient
     }
 
     /**
-     * Exchange authorization code for access token
+     * Exchange authorization code for a short-lived access token
      */
     public function exchangeCode(string $code): array
     {
@@ -67,35 +72,233 @@ class ThreadsClient
     }
 
     /**
-     * Publish a text post to Threads (two-step process)
+     * Exchange a short-lived token for a long-lived token (60 days)
      */
-    public function publishPost(ThreadsAccount $account, string $text): array
+    public function exchangeLongLivedToken(string $shortLivedToken): array
     {
-        // Step 1: Create media container
-        $container = $this->createMediaContainer($account, $text);
-        $containerId = $container['id'];
-
-        // Wait for container to be ready (Threads requires this)
-        sleep(2);
-
-        // Step 2: Publish the container
-        return $this->publishContainer($account, $containerId);
-    }
-
-    /**
-     * Step 1: Create a media container
-     */
-    private function createMediaContainer(ThreadsAccount $account, string $text): array
-    {
-        $response = $this->http->post("{$this->baseUrl}/{$account->threads_user_id}/threads", [
-            'form_params' => [
-                'media_type' => 'TEXT',
-                'text' => $text,
-                'access_token' => $account->access_token,
+        $response = $this->http->get('https://graph.threads.net/access_token', [
+            'query' => [
+                'grant_type' => 'th_exchange_token',
+                'client_secret' => $_ENV['THREADS_APP_SECRET'],
+                'access_token' => $shortLivedToken,
             ],
         ]);
 
         return json_decode($response->getBody()->getContents(), true);
+    }
+
+    /**
+     * Inspect token metadata and granted scopes (Threads debug_token endpoint).
+     */
+    public function debugToken(string $accessToken): array
+    {
+        $response = $this->http->get("{$this->baseUrl}/debug_token", [
+            'query' => [
+                'access_token' => $accessToken,
+                'input_token' => $accessToken,
+            ],
+        ]);
+
+        $payload = json_decode($response->getBody()->getContents(), true);
+
+        return $payload['data'] ?? [];
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getTokenScopes(string $accessToken): array
+    {
+        $debug = $this->debugToken($accessToken);
+
+        return $debug['scopes'] ?? [];
+    }
+
+    public function tokenHasScope(string $accessToken, string $scope): bool
+    {
+        return in_array($scope, $this->getTokenScopes($accessToken), true);
+    }
+
+    public function assertCanPublishReplyChain(ThreadsAccount $account, int $replyCount): void
+    {
+        if ($replyCount <= 1) {
+            return;
+        }
+
+        if ($this->tokenHasScope($account->access_token, 'threads_manage_replies')) {
+            return;
+        }
+
+        $scopes = $this->getTokenScopes($account->access_token);
+
+        throw new \RuntimeException(
+            'Your Threads token does not include threads_manage_replies (required for reply 2+). '
+            . 'Granted scopes: ' . (empty($scopes) ? 'none detected' : implode(', ', $scopes)) . '. '
+            . 'In Meta Developer → Use cases → Threads API, add threads_manage_replies, then '
+            . 'Disconnect and Connect again in Settings.'
+        );
+    }
+
+    /**
+     * Fetch profile for a token before the account row exists
+     */
+    public function getProfileByToken(string $accessToken): array
+    {
+        $response = $this->http->get("{$this->baseUrl}/me", [
+            'query' => [
+                'fields' => 'id,username,threads_profile_picture_url,threads_biography',
+                'access_token' => $accessToken,
+            ],
+        ]);
+
+        return json_decode($response->getBody()->getContents(), true);
+    }
+
+    /**
+     * Publish a single text post to Threads
+     */
+    public function publishPost(ThreadsAccount $account, string $text): array
+    {
+        $result = $this->publishThread($account, [$text]);
+
+        return [
+            'id' => $result['root_post_id'],
+            'thread' => $result,
+        ];
+    }
+
+    /**
+     * Publish a thread: first post is root, each following item is a reply in the chain
+     *
+     * @param  string[]  $texts
+     */
+    public function publishThread(ThreadsAccount $account, array $texts): array
+    {
+        $texts = array_values(array_filter(array_map('trim', $texts)));
+
+        if ($texts === []) {
+            throw new \InvalidArgumentException('No reply texts to publish');
+        }
+
+        $this->assertCanPublishReplyChain($account, count($texts));
+
+        $delay = (int) ($_ENV['THREADS_PUBLISH_DELAY_SECONDS'] ?? 5);
+        $afterPublishDelay = (int) ($_ENV['THREADS_AFTER_PUBLISH_DELAY_SECONDS'] ?? 3);
+        $postIds = [];
+
+        foreach ($texts as $index => $text) {
+            $replyNum = $index + 1;
+
+            try {
+                $text = $this->truncateForThreads($text);
+                $parentId = $postIds[$index - 1] ?? null;
+
+                $container = $this->createTextContainer($account, $text, $parentId);
+
+                if (empty($container['id'])) {
+                    throw new \RuntimeException(
+                        $container['error_message'] ?? 'Failed to create media container for reply ' . $replyNum
+                    );
+                }
+
+                sleep($delay);
+
+                $published = $this->publishContainer($account, $container['id']);
+
+                if (empty($published['id'])) {
+                    throw new \RuntimeException(
+                        $published['error_message'] ?? 'Failed to publish reply ' . $replyNum
+                    );
+                }
+
+                $postIds[] = $published['id'];
+
+                if ($index < count($texts) - 1) {
+                    sleep($afterPublishDelay);
+                }
+            } catch (\Exception $e) {
+                if ($postIds !== []) {
+                    throw new \RuntimeException(
+                        sprintf(
+                            'Published %d of %d replies, then failed on reply %d: %s',
+                            count($postIds),
+                            count($texts),
+                            $replyNum,
+                            $e->getMessage()
+                        ),
+                        0,
+                        $e
+                    );
+                }
+
+                throw $e;
+            }
+        }
+
+        return [
+            'root_post_id' => $postIds[0],
+            'post_ids' => $postIds,
+            'published_count' => count($postIds),
+        ];
+    }
+
+    /**
+     * Step 1: Create a text media container (optional reply_to_id chains the thread)
+     */
+    private function createTextContainer(ThreadsAccount $account, string $text, ?string $replyToId = null): array
+    {
+        $params = [
+            'media_type' => 'TEXT',
+            'text' => $text,
+            'access_token' => $account->access_token,
+        ];
+
+        if ($replyToId !== null) {
+            $params['reply_to_id'] = $replyToId;
+        }
+
+        // Meta docs use /me/threads for reply containers with the user's access token
+        return $this->postForm("{$this->baseUrl}/me/threads", $params, $replyToId !== null);
+    }
+
+    /**
+     * @param  array<string, string>  $params
+     */
+    private function postForm(string $url, array $params, bool $isReply = false): array
+    {
+        try {
+            $response = $this->http->post($url, ['form_params' => $params]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (ClientException $e) {
+            throw new \RuntimeException($this->formatApiError($e, $isReply), 0, $e);
+        }
+    }
+
+    private function formatApiError(ClientException $e, bool $isReply = false): string
+    {
+        $body = $e->getResponse()->getBody()->getContents();
+        $data = json_decode($body, true);
+        $message = $data['error']['message'] ?? $e->getMessage();
+        $code = $data['error']['code'] ?? null;
+
+        if ($isReply && (int) $code === 10) {
+            $message .= ' Your token is missing threads_manage_replies. In Meta app settings, add that permission, '
+                . 'then disconnect and reconnect Threads in AutoThreads Settings.';
+        }
+
+        return $message;
+    }
+
+    private function truncateForThreads(string $text): string
+    {
+        $max = (int) ($_ENV['THREADS_MAX_TEXT_LENGTH'] ?? 500);
+
+        if (mb_strlen($text) <= $max) {
+            return $text;
+        }
+
+        return mb_substr($text, 0, $max - 1) . '…';
     }
 
     /**
@@ -103,14 +306,10 @@ class ThreadsClient
      */
     private function publishContainer(ThreadsAccount $account, string $containerId): array
     {
-        $response = $this->http->post("{$this->baseUrl}/{$account->threads_user_id}/threads_publish", [
-            'form_params' => [
-                'creation_id' => $containerId,
-                'access_token' => $account->access_token,
-            ],
+        return $this->postForm("{$this->baseUrl}/{$account->threads_user_id}/threads_publish", [
+            'creation_id' => $containerId,
+            'access_token' => $account->access_token,
         ]);
-
-        return json_decode($response->getBody()->getContents(), true);
     }
 
     /**

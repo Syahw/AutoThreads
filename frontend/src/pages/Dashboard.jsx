@@ -1,6 +1,9 @@
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
-import { BarChart3, Sparkles, Calendar, TrendingUp } from 'lucide-react';
+import { BarChart3, Sparkles, Calendar, TrendingUp, ArrowRight, Zap } from 'lucide-react';
+import PageHeader from '../components/ui/PageHeader';
+import StatCard from '../components/ui/StatCard';
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
@@ -9,66 +12,84 @@ export default function Dashboard() {
   });
 
   if (isLoading) {
-    return <div className="animate-pulse">Loading dashboard...</div>;
+    return (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="card skeleton h-28" />
+        ))}
+      </div>
+    );
   }
 
   const cards = [
-    { label: 'Total Posts', value: stats?.total_posts ?? 0, icon: Sparkles, color: 'blue' },
-    { label: 'Scheduled', value: stats?.scheduled_pending ?? 0, icon: Calendar, color: 'amber' },
-    { label: 'Posted This Week', value: stats?.posted_this_week ?? 0, icon: TrendingUp, color: 'green' },
-    { label: 'Avg Quality', value: `${stats?.avg_quality_score ?? 0}/100`, icon: BarChart3, color: 'purple' },
+    { label: 'Total Posts', value: stats?.total_posts ?? 0, icon: Sparkles, accent: 'brand' },
+    { label: 'Scheduled', value: stats?.scheduled_pending ?? 0, icon: Calendar, accent: 'amber' },
+    { label: 'Posted This Week', value: stats?.posted_this_week ?? 0, icon: TrendingUp, accent: 'emerald' },
+    { label: 'Avg Quality', value: `${stats?.avg_quality_score ?? 0}/100`, icon: BarChart3, accent: 'violet' },
   ];
+
+  const quickLinks = [
+    { to: '/content', label: 'Generate new content', desc: 'AI threads in Bahasa Malaysia', color: 'brand' },
+    { to: '/scheduler', label: 'View scheduled posts', desc: 'Queue and timing', color: 'amber' },
+    { to: '/analytics', label: 'Check analytics', desc: 'Performance insights', color: 'emerald' },
+  ];
+
+  const linkStyles = {
+    brand: 'hover:border-brand-200 hover:bg-brand-50/50 group-hover:text-brand-700 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/10 dark:group-hover:text-brand-300',
+    amber: 'hover:border-amber-200 hover:bg-amber-50/50 group-hover:text-amber-700 dark:hover:border-amber-500/40 dark:hover:bg-amber-500/10 dark:group-hover:text-amber-300',
+    emerald: 'hover:border-emerald-200 hover:bg-emerald-50/50 group-hover:text-emerald-700 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10 dark:group-hover:text-emerald-300',
+  };
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      <PageHeader
+        title="Welcome back"
+        description="Overview of your content pipeline, scheduling, and Threads publishing."
+      />
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {cards.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-gray-500">{label}</span>
-              <Icon size={18} className={`text-${color}-500`} />
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
-          </div>
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {cards.map((card) => (
+          <StatCard key={card.label} {...card} />
         ))}
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="card p-6">
+          <div className="mb-5 flex items-center gap-2">
+            <Zap size={18} className="text-brand-500 dark:text-brand-400" />
+            <h2 className="text-heading text-lg font-semibold">Quick actions</h2>
+          </div>
           <div className="space-y-3">
-            <a href="/content" className="block p-3 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">
-              Generate new content
-            </a>
-            <a href="/scheduler" className="block p-3 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
-              View scheduled posts
-            </a>
-            <a href="/analytics" className="block p-3 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
-              Check analytics
-            </a>
+            {quickLinks.map(({ to, label, desc, color }) => (
+              <Link
+                key={to}
+                to={to}
+                className={`group flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-4 transition-all dark:border-slate-700 dark:bg-slate-800/40 ${linkStyles[color]}`}
+              >
+                <div>
+                  <p className="text-subheading font-medium">{label}</p>
+                  <p className="text-muted mt-0.5 text-xs">{desc}</p>
+                </div>
+                <ArrowRight size={18} className="text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-current dark:text-slate-600" />
+              </Link>
+            ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">System Status</h2>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Total Impressions</span>
-              <span className="font-medium">{stats?.total_impressions?.toLocaleString() ?? 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Total Engagement</span>
-              <span className="font-medium">{stats?.total_engagement?.toLocaleString() ?? 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Failed Posts</span>
-              <span className="font-medium text-red-600">{stats?.failed_posts ?? 0}</span>
-            </div>
-          </div>
+        <div className="card p-6">
+          <h2 className="text-heading mb-5 text-lg font-semibold">System status</h2>
+          <dl className="space-y-4">
+            {[
+              { label: 'Total impressions', value: stats?.total_impressions?.toLocaleString() ?? 0 },
+              { label: 'Total engagement', value: stats?.total_engagement?.toLocaleString() ?? 0 },
+              { label: 'Failed posts', value: stats?.failed_posts ?? 0, danger: true },
+            ].map(({ label, value, danger }) => (
+              <div key={label} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0 dark:border-slate-800">
+                <dt className="text-muted text-sm">{label}</dt>
+                <dd className={`text-sm font-semibold ${danger ? 'text-red-600 dark:text-red-400' : 'text-heading'}`}>{value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </div>
     </div>
