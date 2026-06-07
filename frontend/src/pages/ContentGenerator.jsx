@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import {
-  Sparkles, RefreshCw, Check, X, Loader2, Send, FileText, Pencil, Save, Link2, Calendar,
+  Sparkles, RefreshCw, Check, X, Loader2, Send, FileText, Pencil, Save, Link2, Calendar, ImagePlus, Trash2,
 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -80,6 +80,25 @@ export default function ContentGenerator() {
     },
   });
 
+  const uploadHookImageMutation = useMutation({
+    mutationFn: ({ id, file }) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      return api.post(`/content/${id}/hook-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content'] }),
+    onError: (err) => {
+      setPublishError(err.response?.data?.message || 'Image upload failed');
+    },
+  });
+
+  const deleteHookImageMutation = useMutation({
+    mutationFn: (id) => api.delete(`/content/${id}/hook-image`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content'] }),
+  });
+
   const { data: schedulerSettings } = useQuery({
     queryKey: ['scheduler-settings'],
     queryFn: () => api.get('/scheduler/settings').then((r) => r.data.data),
@@ -138,6 +157,14 @@ export default function ContentGenerator() {
       id: postId,
       affiliate_link_id: affiliateLinkId ? parseInt(affiliateLinkId, 10) : null,
     });
+  };
+
+  const onPickHookImage = (postId, event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPublishError(null);
+    uploadHookImageMutation.mutate({ id: postId, file });
+    event.target.value = '';
   };
 
   const generatePayload = {
@@ -311,7 +338,47 @@ export default function ContentGenerator() {
                 )}
 
                 {(post.status === 'draft' || post.status === 'approved') && (
-                  <div className="panel-muted mt-4 flex flex-wrap items-end gap-3 p-3">
+                  <div className="panel-muted mt-4 space-y-4 p-3">
+                    <div>
+                      <label className="text-muted mb-2 flex items-center gap-1 text-xs font-medium">
+                        <ImagePlus size={12} /> Hook image (optional)
+                      </label>
+                      <p className="text-muted mb-3 text-xs">
+                        Attached to Reply 1 when published. JPEG or PNG, max 8 MB. Meta needs a public HTTPS URL (your ngrok tunnel).
+                      </p>
+                      {post.hook_image_url ? (
+                        <div className="flex flex-wrap items-start gap-3">
+                          <img
+                            src={post.hook_image_url}
+                            alt="Hook preview"
+                            className="max-h-40 max-w-full rounded-lg border border-slate-200 object-contain dark:border-slate-700"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => deleteHookImageMutation.mutate(post.id)}
+                            disabled={deleteHookImageMutation.isPending}
+                            className="btn-secondary !py-2 !text-xs"
+                          >
+                            {deleteHookImageMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            Remove image
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="btn-secondary !py-2 !text-xs inline-flex cursor-pointer items-center gap-2">
+                          {uploadHookImageMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                          Upload hook image
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                            className="sr-only"
+                            disabled={uploadHookImageMutation.isPending}
+                            onChange={(e) => onPickHookImage(post.id, e)}
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-end gap-3 border-t border-slate-200/80 pt-4 dark:border-slate-700/80">
                     <div className="min-w-[12rem] flex-1">
                       <label className="text-muted mb-1 flex items-center gap-1 text-xs font-medium">
                         <Link2 size={12} /> Affiliate link (optional)
@@ -333,6 +400,7 @@ export default function ContentGenerator() {
                         Contains <code className="code-inline">[link]</code> — will be removed on publish unless you pick an affiliate.
                       </span>
                     )}
+                    </div>
                   </div>
                 )}
 

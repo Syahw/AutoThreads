@@ -6,6 +6,7 @@ use AutoThreads\Models\GeneratedPost;
 use AutoThreads\Models\ThreadsAccount;
 use AutoThreads\Services\AI\ContentGenerator;
 use AutoThreads\Services\AI\Humanizer;
+use AutoThreads\Services\Media\HookImageStorage;
 use AutoThreads\Services\Threads\ThreadPublisher;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -13,10 +14,12 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 class ContentController
 {
     private ContentGenerator $generator;
+    private HookImageStorage $hookImages;
 
     public function __construct()
     {
         $this->generator = new ContentGenerator();
+        $this->hookImages = new HookImageStorage();
     }
 
     public function index(Request $request, Response $response): Response
@@ -44,7 +47,7 @@ class ContentController
         $total = $query->count();
 
         return $this->json($response, [
-            'data' => $posts,
+            'data' => $posts->map(fn (GeneratedPost $post) => $this->serializePost($post)),
             'total' => $total,
             'limit' => (int) ($params['limit'] ?? 20),
             'offset' => (int) ($params['offset'] ?? 0),
@@ -78,7 +81,7 @@ class ContentController
             $post = $this->generator->generate($config);
             return $this->json($response, [
                 'message' => 'Content generated',
-                'data' => $post,
+                'data' => $this->serializePost($post),
             ], 201);
         } catch (\Exception $e) {
             return $this->json($response, [
@@ -162,7 +165,64 @@ class ContentController
 
         $post->update($updates);
 
-        return $this->json($response, ['message' => 'Post updated', 'data' => $post->fresh()]);
+        return $this->json($response, ['message' => 'Post updated', 'data' => $this->serializePost($post->fresh())]);
+    }
+
+    public function uploadHookImage(Request $request, Response $response, array $args): Response
+    {
+        $userId = (int) $request->getAttribute('user_id');
+        $post = GeneratedPost::where('id', $args['id'])
+            ->where('user_id', $userId)
+            ->firstOrFail();
+
+        if (!in_array($post->status, ['draft', 'approved'], true)) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Hook image can only be added to draft or approved posts',
+            ], 422);
+        }
+
+        $files = $request->getUploadedFiles();
+        $file = $files['image'] ?? null;
+
+        if ($file === null) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Missing image file (field name: image)',
+            ], 422);
+        }
+
+        try {
+            $stored = $this->hookImages->store($userId, $file);
+            $this->hookImages->attachToPost($post, $stored);
+
+            return $this->json($response, [
+                'message' => 'Hook image uploaded',
+                'data' => $this->serializePost($post->fresh()),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json($response, ['error' => true, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Upload failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function deleteHookImage(Request $request, Response $response, array $args): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $post = GeneratedPost::where('id', $args['id'])
+            ->where('user_id', $userId)
+            ->firstOrFail();
+
+        $this->hookImages->deleteForPost($post);
+
+        return $this->json($response, [
+            'message' => 'Hook image removed',
+            'data' => $this->serializePost($post->fresh()),
+        ]);
     }
 
     public function approve(Request $request, Response $response, array $args): Response
@@ -271,11 +331,23 @@ class ContentController
     public function destroy(Request $request, Response $response, array $args): Response
     {
         $userId = $request->getAttribute('user_id');
-        GeneratedPost::where('id', $args['id'])
+        $post = GeneratedPost::where('id', $args['id'])
             ->where('user_id', $userId)
-            ->delete();
+            ->firstOrFail();
+
+        $filename = $post->metadata['hook_image']['filename'] ?? null;
+        $this->hookImages->removeStoredFile(is_string($filename) ? $filename : null);
+        $post->delete();
 
         return $this->json($response, ['message' => 'Post deleted']);
+    }
+
+    private function serializePost(GeneratedPost $post): array
+    {
+        $data = $post->toArray();
+        $data['hook_image_url'] = $this->hookImages->resolvePublicUrl($post);
+
+        return $data;
     }
 
     private function json(Response $response, array $data, int $status = 200): Response

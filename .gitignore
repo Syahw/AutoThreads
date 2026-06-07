@@ -18,6 +18,8 @@ Thumbs.db
 
 # Logs
 backend/storage/logs/*.log
+backend/storage/uploads/**/*
+!backend/storage/uploads/**/.gitkeep
 
 # Build
 frontend/dist/

@@ -6,16 +6,22 @@ use AutoThreads\Models\AffiliateLink;
 use AutoThreads\Models\GeneratedPost;
 use AutoThreads\Models\ThreadsAccount;
 use AutoThreads\Services\AI\Humanizer;
+use AutoThreads\Services\Media\HookImageStorage;
 
 class ThreadPublisher
 {
     private ThreadsClient $threadsClient;
     private Humanizer $humanizer;
+    private HookImageStorage $hookImages;
 
-    public function __construct(?ThreadsClient $threadsClient = null, ?Humanizer $humanizer = null)
-    {
+    public function __construct(
+        ?ThreadsClient $threadsClient = null,
+        ?Humanizer $humanizer = null,
+        ?HookImageStorage $hookImages = null
+    ) {
         $this->threadsClient = $threadsClient ?? new ThreadsClient();
         $this->humanizer = $humanizer ?? new Humanizer();
+        $this->hookImages = $hookImages ?? new HookImageStorage();
     }
 
     /**
@@ -31,7 +37,10 @@ class ThreadPublisher
 
         $replies = $this->applyAffiliateLink($post, $replies);
 
-        return $this->threadsClient->publishThread($account, $replies);
+        $hookImageUrl = $this->hookImages->resolvePublicUrl($post);
+        $this->hookImages->assertReachableByMeta($hookImageUrl);
+
+        return $this->threadsClient->publishThread($account, $replies, $hookImageUrl);
     }
 
     /**

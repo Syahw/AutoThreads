@@ -19,6 +19,7 @@ use AutoThreads\Controllers\AffiliateController;
 use AutoThreads\Controllers\AnalyticsController;
 use AutoThreads\Controllers\SettingsController;
 use AutoThreads\Controllers\ThreadsController;
+use AutoThreads\Controllers\MediaController;
 
 // API root - friendly landing response so the base URL isn't a 404
 $app->get('/', function ($request, $response) {
@@ -42,6 +43,9 @@ $app->get('/health', function ($request, $response) {
     ]));
     return $response->withHeader('Content-Type', 'application/json');
 });
+
+// Public hook images — Meta fetches these (no JWT). Must stay outside /api/v1.
+$app->get('/media/{filename}', [MediaController::class, 'show']);
 
 $app->group('/api/v1', function (RouteCollectorProxy $group) {
 
@@ -82,6 +86,8 @@ $app->group('/api/v1', function (RouteCollectorProxy $group) {
         $protected->post('/content/generate', [ContentController::class, 'generate']);
         $protected->post('/content/{id}/regenerate', [ContentController::class, 'regenerate']);
         $protected->put('/content/{id}', [ContentController::class, 'update']);
+        $protected->post('/content/{id}/hook-image', [ContentController::class, 'uploadHookImage']);
+        $protected->delete('/content/{id}/hook-image', [ContentController::class, 'deleteHookImage']);
         $protected->put('/content/{id}/approve', [ContentController::class, 'approve']);
         $protected->post('/content/{id}/publish', [ContentController::class, 'publish']);
         $protected->put('/content/{id}/reject', [ContentController::class, 'reject']);
@@ -105,9 +111,11 @@ $app->group('/api/v1', function (RouteCollectorProxy $group) {
 
         // Analytics
         $protected->get('/analytics/overview', [AnalyticsController::class, 'overview']);
+        $protected->get('/analytics/trend', [AnalyticsController::class, 'engagementTrend']);
         $protected->get('/analytics/posts', [AnalyticsController::class, 'postPerformance']);
         $protected->get('/analytics/best-times', [AnalyticsController::class, 'bestTimes']);
         $protected->get('/analytics/best-hooks', [AnalyticsController::class, 'bestHooks']);
+        $protected->post('/analytics/collect', [AnalyticsController::class, 'collect']);
 
         // Threads Integration
         $protected->get('/threads/connect', [ThreadsController::class, 'connect']);

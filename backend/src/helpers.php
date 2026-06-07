@@ -55,3 +55,26 @@ if (!function_exists('guzzle_ssl_verify')) {
         return file_exists($caBundle) ? $caBundle : true;
     }
 }
+
+if (!function_exists('public_media_base_url')) {
+    /**
+     * HTTPS base URL where Meta can fetch uploaded media (ngrok in local dev).
+     */
+    function public_media_base_url(): string
+    {
+        if (!empty($_ENV['PUBLIC_MEDIA_BASE_URL'])) {
+            return rtrim((string) $_ENV['PUBLIC_MEDIA_BASE_URL'], '/');
+        }
+
+        $redirect = $_ENV['THREADS_REDIRECT_URI'] ?? '';
+        if (is_string($redirect) && $redirect !== '') {
+            $base = preg_replace('#/api/v1/threads/callback$#', '', $redirect);
+
+            if (is_string($base) && $base !== '') {
+                return rtrim($base, '/');
+            }
+        }
+
+        return rtrim((string) ($_ENV['APP_URL'] ?? ''), '/');
+    }
+}

@@ -171,8 +171,9 @@ class ThreadsClient
      * Publish a thread: first post is root, each following item is a reply in the chain
      *
      * @param  string[]  $texts
+     * @param  string|null  $hookImageUrl  Public HTTPS URL for reply 1 image (optional)
      */
-    public function publishThread(ThreadsAccount $account, array $texts): array
+    public function publishThread(ThreadsAccount $account, array $texts, ?string $hookImageUrl = null): array
     {
         $texts = array_values(array_filter(array_map('trim', $texts)));
 
@@ -193,7 +194,9 @@ class ThreadsClient
                 $text = $this->truncateForThreads($text);
                 $parentId = $postIds[$index - 1] ?? null;
 
-                $container = $this->createTextContainer($account, $text, $parentId);
+                $container = ($index === 0 && $hookImageUrl !== null && $hookImageUrl !== '')
+                    ? $this->createImageContainer($account, $text, $hookImageUrl, $parentId)
+                    : $this->createTextContainer($account, $text, $parentId);
 
                 if (empty($container['id'])) {
                     throw new \RuntimeException(
@@ -258,6 +261,29 @@ class ThreadsClient
         }
 
         // Meta docs use /me/threads for reply containers with the user's access token
+        return $this->postForm("{$this->baseUrl}/me/threads", $params, $replyToId !== null);
+    }
+
+    /**
+     * Image container for the root hook (caption in text).
+     */
+    private function createImageContainer(
+        ThreadsAccount $account,
+        string $text,
+        string $imageUrl,
+        ?string $replyToId = null
+    ): array {
+        $params = [
+            'media_type' => 'IMAGE',
+            'image_url' => $imageUrl,
+            'text' => $this->truncateForThreads($text),
+            'access_token' => $account->access_token,
+        ];
+
+        if ($replyToId !== null) {
+            $params['reply_to_id'] = $replyToId;
+        }
+
         return $this->postForm("{$this->baseUrl}/me/threads", $params, $replyToId !== null);
     }
 
