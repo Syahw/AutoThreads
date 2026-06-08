@@ -32,10 +32,13 @@ class MediaController
             default => 'image/jpeg',
         };
 
-        $response->getBody()->write((string) file_get_contents($path));
+        $bytes = (string) file_get_contents($path);
+        $response->getBody()->write($bytes);
 
         return $response
             ->withHeader('Content-Type', $mime)
-            ->withHeader('Cache-Control', 'public, max-age=86400');
+            ->withHeader('Content-Length', (string) strlen($bytes))
+            ->withHeader('Cache-Control', 'public, max-age=86400')
+            ->withHeader('Accept-Ranges', 'bytes');
     }
 }

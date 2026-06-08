@@ -32,7 +32,7 @@ class PromptBuilder
     private array $categoryTemplates = [
         'story' => 'Tulis cerita pendek atau pengalaman peribadi yang secara natural membawa kepada cadangan {product}. Buat macam cerita dengan kawan.',
         'product_recommendation' => 'Buat cadangan produk {product} yang genuine, macam nasihat organik bukan iklan. Fokus satu manfaat spesifik.',
-        'comparison' => 'Tulis post perbandingan ringkas yang letak {product} secara positif tanpa bash alternatif lain. Guna framing "aku dah try dua-dua".',
+        'comparison' => 'Kongsi pengalaman sebenar dengan {product} — apa yang berubah, apa yang tak expected. Jangan guna template "dua pendekatan" atau format pro/con rigid.',
         'productivity_tip' => 'Kongsi tip produktiviti yang secara natural masukkan {product} sebagai sebahagian workflow. Buat ia actionable.',
         'viral_hook' => 'Tulis hook yang buat orang stop scroll, diikuti insight bernilai yang connect dengan {product}. Utamakan curiosity gap.',
         'opinion' => 'Kongsi pendapat berani tentang ruang {niche} yang bawa kepada mention {product} sebagai solusi. Jadi authentic.',
@@ -45,7 +45,7 @@ class PromptBuilder
     private array $sharingCategoryTemplates = [
         'story' => 'Tulis cerita pendek atau pengalaman peribadi tentang {niche}. Kongsi macam cerita dengan kawan — tiada jualan.',
         'product_recommendation' => 'Kongsi satu tip atau discovery tentang {niche} yang genuinely helpful. Bukan iklan produk.',
-        'comparison' => 'Tulis perbandingan ringkas atau perspektif dua pendekatan dalam {niche}. Guna framing "aku dah try dua-dua".',
+        'comparison' => 'Kongsi pengalaman peribadi dalam {niche} — apa yang kau discover, bukan essay pro/con. Elak template "dua pendekatan" atau soalan "mana satu pilihan korang".',
         'productivity_tip' => 'Kongsi tip produktiviti tentang {niche}. Buat ia actionable dan relatable.',
         'viral_hook' => 'Tulis hook yang buat orang stop scroll, diikuti insight bernilai tentang {niche}. Utamakan curiosity gap.',
         'opinion' => 'Kongsi pendapat berani tentang {niche}. Jadi authentic — ajak perbincangan, bukan jualan.',
@@ -109,112 +109,100 @@ class PromptBuilder
     {
         // Add randomness to thread flow
         $flowVariations = [
-            'Kadang thread stop awal kalau point dah kuat.',
-            'Boleh tambah extra reply kalau storytelling perlukan buildup.',
-            'Ada thread yang lebih pendek dan straight to the point.',
-            'Kadang Reply terakhir lebih reflective daripada CTA.',
-            'Boleh buat pacing slow untuk emotional topic.',
-            'Kadang thread rasa macam sembang random tapi connected.',
-            'Tak semua thread perlu hard closing.',
+            'Thread ni boleh slow burn — ambil masa build scene sebelum sampai point.',
+            'Boleh ada satu reply yang tangent random tapi somehow connected.',
+            'Ending boleh anticlimactic — real life rarely wraps up neat.',
+            'Middle replies boleh include specific sensory detail (bunyi, lighting, mood).',
+            'Boleh admit kau still tak sure pasal sesuatu — uncertainty is human.',
+            'Pacing boleh rasa macam typing while doing something else.',
+            'Last reply tak perlu CTA — boleh just trail off.',
         ];
 
         $randomFlow = $flowVariations[array_rand($flowVariations)];
 
         return <<<PROMPT
-        Kau seorang content creator untuk Threads (platform text-based Meta). Semua output WAJIB dalam Bahasa Malaysia sepenuhnya.
+        Kau seorang penulis Threads biasa — bukan influencer, bukan copywriter iklan. Semua output WAJIB dalam Bahasa Malaysia.
 
-        Kau tulis THREAD (bukan single post). Setiap thread mesti rasa natural, connected, dan conversational.
+        Kau tulis THREAD panjang (bukan single post). Thread mesti rasa macam orang betul-betul cerita kat kawan, bukan script marketing.
 
         PANJANG THREAD (GENERATION INI):
-        - Tulis TEPAT {$replyCount} replies untuk thread ini
-        - Range biasa: 5–7 replies (berbeza setiap generation)
-        - Pilih flow berdasarkan kesesuaian topik dalam {$replyCount} replies
+        - Tulis TEPAT {$replyCount} replies
+        - Setiap reply WAJIB substantif — bukan one-liner kosong
+        - Hook: 40–80 patah perkataan
+        - Middle replies: 80–140 patah perkataan setiap satu (cerita, detail, konteks, perasaan)
+        - Last reply: 40–100 patah perkataan
+        - Total thread target: 800–1300+ patah perkataan keseluruhan
         - Jangan tambah atau kurangkan bilangan reply
 
         SUARA & GAYA:
-        - Tone: {$tone}
+        - Tone: {$tone} — tapi rendahkan hype, naikkan authenticity
         - Gaya penulisan: {$style}
         - Target audience: {$audience}
-        - Platform: Threads (text-first, conversational, setiap reply pendek dan punchy)
+        - Platform: Threads — tapi thread INI sengaja lebih panjang dan mendalam macam rant/reflection, bukan caption pendek
+
+        BUNYI MANUSIA (PENTING):
+        - Tulis macam DM atau voice note yang kau taip lepas main game / buat benda — flat, sincere, kadang boring sikit pun ok
+        - WAJIB vary rhythm: ada ayat panjang meandering, ada ayat pendek biasa je. Jangan setiap ayat same energy
+        - Most replies end with full stop (.) — BUKAN exclamation mark
+        - Max 1 tanda seru (!) untuk SELURUH thread, dan hanya kalau memang natural
+        - JANGAN bunyi excited/teruja/puas hati secara paksa
+        - Elak pattern robot:
+          • "Seriously," / "Legit" / "Best gila" / "Memang beremosi gila"
+          • "vibe unik" / "teruja" / "adrenaline" / "mantap" / "puas hati"
+          • "Mana satu pilihan korang?" / "Komen bawah!" (CTA template)
+          • Setiap reply tanya soalan retorik
+          • List pro/con yang too neat (Reply 1 intro, Reply 2 option A, Reply 3 option B...)
+        - Kalau nak tanya soalan, max 1 soalan untuk whole thread — dan biar casual, bukan poll
 
         BAHASA:
-        - Tulis SEPENUHNYA dalam Bahasa Malaysia
-        - Guna bahasa santai ala Malaysian — natural tapi EJAAN BETUL (tiada typo)
-        - WAJIB eja perkataan dengan betul: "biasa", "dengan", "riang", "kecil", "special" — JANGAN salah huruf macam "bdiasa", "ngan rdiang", "specdial", "kecik" melainkan perkataan itu memang slang standard (contoh: "je", "dah", "tak", "nak")
-        - Boleh guna perkataan santai standard: "korang", "aku", "memang", "best gila", "seriously", "legit"
-        - Jangan guna bahasa baku berlebihan atau ayat kaku macam essay
-        - Boleh masukkan English words yang orang Malaysia memang guna (literally, actually) — jangan direct translate dari English
-        - Semak semula setiap reply: tiada missing letter, tiada random typo, grammar masih natural
+        - Tulis SEPENUHNYA dalam Bahasa Malaysia santai
+        - EJAAN BETUL — tiada typo random
+        - Guna "aku", "korang", "dah", "tak", "nak", "je" — natural spoken BM
+        - Jangan bahasa baku/essay ("namun", "walau bagaimanapun", "kesimpulannya", "adalah")
+        - English words ok kalau natural ("literally", "actually") — jangan overuse
+        - Jangan direct translate English idioms
 
         FLOW THREAD:
-        Reply 1:
-        - WAJIB jadi hook
-        - Pendek dan grab attention
-        - Buat curiosity, emotional trigger, atau relatable thought
-        - JANGAN explain semua terus
-        - Sekitar 20-40 patah perkataan
+        Reply 1 (hook):
+        - Mula dengan specific moment, thought, atau scene — bukan announcement "aku nak kongsi"
+        - Jangan reveal semua. Tarik reader masuk slowly
 
-        Middle Replies:
-        - Expand idea slowly
-        - Boleh mix:
-        • elaboration
-        • personal observation
-        • relatable situation
-        • mini-story
-        • emotional reflection
-        • hot take
-        • realization
-        - Tak perlu ikut format rigid
-        - Biarkan flow rasa natural macam orang tengah bercakap
+        Middle replies:
+        - Build cerita layer by layer — detail spesifik (nama tempat, scene, perasaan sebenar)
+        - Boleh tangent sikit macam orang betul bercakap
+        - Show don't tell — "jantung berdegup" style cliché elakkan
+        - Boleh admit doubt, confusion, mixed feelings — itu lebih human
 
-        Last Reply:
-        - Boleh jadi CTA
-        - Boleh jadi reflective ending
-        - Boleh jadi open-ended question
-        - Boleh jadi strong final thought
-        - Kalau ada produk/link, WAJIB mention hanya di last reply menggunakan [link]
+        Last reply:
+        - Soft landing — reflection, half-formed thought, atau low-key question
+        - Kalau ada produk/link, mention natural je di sini guna [link] — bukan hard sell
+        - Jangan "Komen bawah!" atau engagement bait template
 
         PERATURAN KETAT:
-        1. Tulis macam orang biasa share pemikiran genuine, BUKAN macam marketer
-        2. Jangan guna frasa AI yang obvious:
-        - "game-changer"
-        - "dive into"
-        - "unlock"
-        - "leverage"
-        - "dalam dunia hari ini"
-        - "perlu diingatkan"
-        3. Jangan mula semua ayat dengan pattern sama
-        4. Grammar santai dan natural — BUKAN salah ejaan
-        5. Setiap reply pendek dan senang baca
-        6. Seluruh thread mesti rasa connected
-        7. Jangan ulang point yang sama
-        8. Hook jangan mention produk terus
-        9. Link hanya dibenarkan pada reply terakhir
-        10. JANGAN guna hashtag langsung
-        11. Bunyi macam tengah text/member sembang, bukan blog post
-        12. Natural dan imperfect dalam flow/idea — bukan dalam spelling
+        1. Genuine thought-sharing, BUKAN content creator performing excitement
+        2. Jangan frasa AI: "game-changer", "dive into", "unlock", "leverage", "dalam dunia hari ini"
+        3. Jangan mula consecutive replies dengan pattern sama ("Aku ingat...", "Kalau kau...", "Tapi kadang...")
+        4. Grammar santai tapi ejaan betul
+        5. Thread connected tapi tak rigid — boleh rasa messy macam real conversation
+        6. Jangan ulang point
+        7. Hook jangan mention produk
+        8. Link hanya di last reply
+        9. NO hashtags
+        10. Prefer periods over exclamation marks
 
         VARIASI FLOW:
         {$randomFlow}
 
         ANTI-REPETITION:
-        - Jangan ulang hook dari generation sebelum
-        - Rotate antara:
-        • emotional opening
-        • observation
-        • controversial thought
-        • question-based hook
-        • mini-story opening
-        - Vary panjang ayat
-        - Campur short punchy line dengan ayat slightly panjang
-        - Boleh lowercase pada hook untuk vibe casual — tetap ejaan betul
+        - Rotate opening styles: scene-setting, mid-thought, quiet observation, specific complaint
+        - Vary sentence length aggressively
+        - Some replies boleh start lowercase for casual vibe
 
         OUTPUT FORMAT:
-        - Label setiap bahagian sebagai:
         Reply 1:
         Reply 2:
-        dan seterusnya
-        - Jangan tambah explanation luar thread
+        (dan seterusnya)
+        - Tiada intro/outro di luar thread
         PROMPT;
     }
 
@@ -253,9 +241,10 @@ class PromptBuilder
 
         $prompt .= "\nFORMAT OUTPUT (WAJIB IKUT EXACTLY):\n";
         $prompt .= $this->buildReplyFormatSection($replyCount);
-        $prompt .= "Tulis sepenuhnya dalam Bahasa Malaysia (santai, natural, ejaan betul, tanpa typo).\n";
+        $prompt .= "Tulis sepenuhnya dalam Bahasa Malaysia (santai, sincere, ejaan betul).\n";
+        $prompt .= "PANJANG: setiap reply middle reply 80–140 patah perkataan. Total thread 800+ patah perkataan.\n";
+        $prompt .= "ENERGI: rendah-key, jangan paksa excitement atau tanda seru.\n";
         $prompt .= "JANGAN tambah apa-apa text lain selain format di atas. EXACTLY {$replyCount} replies.\n";
-        $prompt .= "Final check: setiap perkataan mesti dibaca dengan lancar — reject output yang ada typo random.\n";
 
         return $prompt;
     }
@@ -264,32 +253,92 @@ class PromptBuilder
     {
         $hintsByCount = [
             5 => [
-                1 => '[hook content]',
-                2 => '[elaboration content]',
-                3 => '[example/story content]',
-                4 => '[insight/value content]',
-                5 => '[cta/closing content]',
+                1 => '[hook — specific scene or thought, 40-80 words]',
+                2 => '[expand with detail and context]',
+                3 => '[personal moment or observation]',
+                4 => '[deeper reflection or tangent]',
+                5 => '[soft closing — reflection or low-key question]',
             ],
             6 => [
-                1 => '[hook content]',
-                2 => '[elaboration content]',
-                3 => '[example/story content]',
-                4 => '[insight/value content]',
-                5 => '[buildup or emotional beat]',
-                6 => '[cta/closing content]',
+                1 => '[hook — specific scene or thought, 40-80 words]',
+                2 => '[expand with detail]',
+                3 => '[story beat or specific example]',
+                4 => '[mixed feelings or realization]',
+                5 => '[additional context or tangent]',
+                6 => '[soft closing]',
             ],
             7 => [
-                1 => '[hook content]',
-                2 => '[elaboration content]',
-                3 => '[example/story content]',
-                4 => '[personal observation or relatable moment]',
-                5 => '[hot take or emotional reflection]',
-                6 => '[insight/value content]',
-                7 => '[cta/closing content]',
+                1 => '[hook — specific scene or thought, 40-80 words]',
+                2 => '[expand slowly]',
+                3 => '[story beat with sensory detail]',
+                4 => '[personal observation]',
+                5 => '[honest reflection — can include doubt]',
+                6 => '[connect back to main thread idea]',
+                7 => '[soft closing]',
+            ],
+            8 => [
+                1 => '[hook — scene-setting, 40-80 words]',
+                2 => '[context and background]',
+                3 => '[first story beat — specific detail]',
+                4 => '[what happened next]',
+                5 => '[how it felt — understated, not dramatic]',
+                6 => '[tangent or related thought]',
+                7 => '[deeper insight or realization]',
+                8 => '[soft closing — no hard CTA]',
+            ],
+            9 => [
+                1 => '[hook — mid-thought opening, 40-80 words]',
+                2 => '[set the scene with specifics]',
+                3 => '[story part 1]',
+                4 => '[story part 2]',
+                5 => '[what surprised you]',
+                6 => '[honest take — can be mixed]',
+                7 => '[related observation]',
+                8 => '[build toward conclusion naturally]',
+                9 => '[soft closing]',
+            ],
+            10 => [
+                1 => '[hook — quiet observation or specific moment]',
+                2 => '[background context, 80+ words]',
+                3 => '[story beat 1]',
+                4 => '[story beat 2]',
+                5 => '[emotional layer — subtle, not dramatic]',
+                6 => '[what you learned or still unsure about]',
+                7 => '[tangent that still connects]',
+                8 => '[second layer of insight]',
+                9 => '[bridge to ending]',
+                10 => '[soft closing — trail off naturally]',
+            ],
+            11 => [
+                1 => '[hook]',
+                2 => '[context]',
+                3 => '[story part 1]',
+                4 => '[story part 2]',
+                5 => '[story part 3]',
+                6 => '[reflection]',
+                7 => '[honest doubt or nuance]',
+                8 => '[related detail]',
+                9 => '[deeper layer]',
+                10 => '[pre-closing thought]',
+                11 => '[soft closing]',
+            ],
+            12 => [
+                1 => '[hook — long scene-setting, up to 80 words]',
+                2 => '[world/context building]',
+                3 => '[story beat 1]',
+                4 => '[story beat 2]',
+                5 => '[story beat 3]',
+                6 => '[understated emotional moment]',
+                7 => '[what changed or didn\'t]',
+                8 => '[honest mixed feelings]',
+                9 => '[tangent or side observation]',
+                10 => '[connect threads of thought]',
+                11 => '[near-end reflection]',
+                12 => '[soft closing — no engagement bait]',
             ],
         ];
 
-        $hints = $hintsByCount[$replyCount] ?? $hintsByCount[5];
+        $hints = $hintsByCount[$replyCount] ?? $this->buildGenericHints($replyCount);
         $section = '';
 
         for ($i = 1; $i <= $replyCount; $i++) {
@@ -300,15 +349,31 @@ class PromptBuilder
         return $section;
     }
 
+    private function buildGenericHints(int $replyCount): array
+    {
+        $hints = [];
+        for ($i = 1; $i <= $replyCount; $i++) {
+            if ($i === 1) {
+                $hints[$i] = '[hook — specific scene or thought, 40-80 words]';
+            } elseif ($i === $replyCount) {
+                $hints[$i] = '[soft closing — no hard CTA]';
+            } else {
+                $hints[$i] = '[story beat, reflection, or detail — 80-140 words]';
+            }
+        }
+
+        return $hints;
+    }
+
     private function getCTAInstruction(string $style): string
     {
         return match ($style) {
-            'soft' => 'Sebut secara natural macam "aku dah guna X lately" atau "jumpa X ni memang helpful"',
-            'direct' => 'Masukkan cadangan yang jelas tapi tak pushy dengan placeholder link [link]',
-            'curiosity' => 'Tease produk tanpa sebut nama terus, buat orang curious',
-            'urgency' => 'Sebut aspek time-sensitive secara natural (limited, baru launch, etc)',
-            'social_proof' => 'Frame macam "semua orang aku kenal dah guna" atau "feed aku penuh pasal ni"',
-            default => 'Sebut secara natural tanpa nampak promotional',
+            'soft' => 'Sebut macam side note je — "aku guna [link] ni" tanpa hard sell',
+            'direct' => 'Mention [link] naturally dalam context, bukan macam iklan',
+            'curiosity' => 'Tease tanpa hype — biar reader curious, bukan excited',
+            'urgency' => 'Elak fake urgency. Kalau perlu mention timing, keep it low-key',
+            'social_proof' => 'Elak "semua orang guna". Prefer personal experience je',
+            default => 'Mention [link] macam recommendation biasa, bukan CTA template',
         };
     }
 }

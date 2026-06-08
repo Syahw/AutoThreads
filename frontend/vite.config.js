@@ -5,13 +5,21 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    host: true,
+    // Leading dot = any ngrok subdomain (avoids updating when tunnel URL changes)
+    allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
     proxy: {
-      // Proxy API calls to the WAMP/Apache backend.
-      // /api/v1/... -> http://localhost/AutoThreads/backend/public/api/v1/...
+      // /api/v1/... -> http://localhost/autothreads/backend/public/api/v1/...
       '/api': {
         target: 'http://localhost',
         changeOrigin: true,
-        rewrite: (path) => `/AutoThreads/backend/public${path}`,
+        rewrite: (path) => `/autothreads/backend/public${path}`,
+      },
+      // Hook images — Meta and the UI fetch /media/{filename} over this ngrok tunnel
+      '/media': {
+        target: 'http://localhost',
+        changeOrigin: true,
+        rewrite: (path) => `/autothreads/backend/public${path}`,
       },
     },
   },

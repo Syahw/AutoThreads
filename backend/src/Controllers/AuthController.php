@@ -32,7 +32,7 @@ class AuthController
         $user = User::create([
             'uuid' => Uuid::uuid4()->toString(),
             'email' => $data['email'],
-            'password_hash' => password_hash($data['password'], PASSWORD_ARGON2ID),
+            'password_hash' => hash_password($data['password']),
             'name' => $data['name'],
             'role' => 'user',
             'plan' => 'free',
@@ -60,7 +60,21 @@ class AuthController
 
         $user = User::where('email', $data['email'])->first();
 
-        if (!$user || !password_verify($data['password'], $user->password_hash)) {
+        if (!$user) {
+            return $this->jsonResponse($response, [
+                'error' => true,
+                'message' => 'Invalid credentials',
+            ], 401);
+        }
+
+        if (!password_hash_supported($user->password_hash)) {
+            return $this->jsonResponse($response, [
+                'error' => true,
+                'message' => 'Password hash is incompatible with this server. Run: php database/reset-password.php your@email.com newpassword',
+            ], 503);
+        }
+
+        if (!password_verify($data['password'], $user->password_hash)) {
             return $this->jsonResponse($response, [
                 'error' => true,
                 'message' => 'Invalid credentials',

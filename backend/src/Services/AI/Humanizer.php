@@ -30,6 +30,30 @@ class Humanizer
         'sehubungan dengan itu', 'tambahan pula',
         'secara keseluruhannya', 'pada hakikatnya',
         'walau bagaimanapun', 'kesimpulannya',
+        // Hype giveaways
+        'best gila', 'memang best', 'beremosi gila', 'puas hati',
+        'vibe unik', 'teruja gila', 'full adrenaline', 'adrenaline penuh',
+        'komen bawah', 'Komen bawah',
+        'just now' => 'tadi',
+        'right now' => 'sekarang',
+        'very' => 'gila',
+        'really' => 'memang',
+        'kind of' => 'macam',
+        'sort of' => 'lebih kurang',
+        'you know' => 'tau tak',
+        'like this' => 'macam ni',
+        'like that' => 'macam tu',
+        'this one' => 'yang ni',
+        'that one' => 'yang tu',
+        'not bad' => 'okay la',
+        'pretty good' => 'boleh tahan',
+        'quite' => 'agak',
+        'already' => 'dah',
+        'still' => 'masih lagi',
+        'again' => 'lagi',
+        'too much' => 'terlebih',
+        'too many' => 'terlalu banyak',
+        'so much' => 'banyak gila',
     ];
     private array $replacements = [
         // Existing AI phrase replacements
@@ -46,12 +70,36 @@ class Humanizer
         'seamlessly' => 'smoothly',
         'effortlessly' => 'easily',
         'streamline' => 'simplify',
+        'in order to' => 'to',
+        'to put it simply' => 'basically',
+        'in simple terms' => 'simply put',
+        'long story short' => 'short story',
+        'to summarise' => 'so yeah',
+        'to summarize' => 'so yeah',
+        'overall, it can be said' => 'overall',
+        'it is clear that' => 'clearly',
+        'it becomes evident' => 'you can see',
+        'a wide range of' => 'lots of',
+        'a variety of' => 'many',
+        'designed to help' => 'meant to help',
+        'built to' => 'made to',
+        'helps you to' => 'helps you',
+        'makes it possible' => 'lets you',
+        'allows you to' => 'lets you',
+        'provides you with' => 'gives you',
+        'ensures that' => 'so that',
+        'it is recommended to' => 'better to',
+        'keep in mind that' => 'just remember',
+        'it is worth mentioning' => 'also',
+        'this approach' => 'this way',
+        'this method' => 'this way',
+        'this solution' => 'this thing',
     
         // BM formal -> casual (keep correct spelling)
         'dalam dunia hari ini' => 'sekarang ni',
         'perlu diingatkan' => '',
         'tidak dapat dinafikan' => 'memang',
-        'sesungguhnya' => 'seriously',
+        'sesungguhnya' => '',
         'adalah penting untuk' => 'penting',
         'di samping itu' => 'lagi satu',
         'sehubungan dengan itu' => '',
@@ -60,6 +108,20 @@ class Humanizer
         'pada hakikatnya' => 'sebenarnya',
         'walau bagaimanapun' => 'tapi',
         'kesimpulannya' => '',
+        // Hype / robotic BM phrases → remove or soften
+        'best gila' => 'okay je',
+        'memang best' => 'okay',
+        'beremosi gila' => 'rasa something',
+        'puas hati' => 'okay',
+        'vibe unik' => '',
+        'seriously' => '',
+        'legit' => '',
+        'teruja' => '',
+        'adrenaline' => '',
+        'Komen bawah!' => '',
+        'komen bawah!' => '',
+        'Mana satu pilihan korang?' => '',
+        'mana satu pilihan korang?' => '',
         'saya rasa' => 'aku rasa',
         'saya fikir' => 'aku rasa',
         'saya telah' => 'aku dah',
@@ -93,6 +155,42 @@ class Humanizer
         'sedikit' => 'sikit',
         'sebentar' => 'kejap',
         'perkara' => 'benda',
+        'tentang' => 'pasal',
+        'tentu' => 'mesti punya',
+        'kedua-dua' => 'dua-dua',
+        'kedua-dua-nya' => 'dua-dua-nya',
+        'kedua-dua-lah' => 'dua-dua-lah',
+        'kedua-dua-itu' => 'dua-dua-itu',
+        'kedua-dua-pula' => 'dua-dua-pula',
+        'kedua-dua-pula' => 'dua-dua-pula',
+
+        // Natural spoken BM (lebih real, less formal)
+        'sekarang ni' => 'sekarang ni',
+        'sangat' => 'gila',
+        'terlalu' => 'terlebih',
+        'agak' => 'macam',
+        'lebih kurang' => 'macam',
+        'lagi satu' => 'oh ya lagi satu',
+        'tapi' => 'tapi kan',
+        'sebenarnya' => 'sebenarnya la',
+        'overall' => 'overall la',
+        'penting' => 'memang kena',
+        'mesti' => 'kena',
+        'nak' => 'nak la',
+        'tak nak' => 'tak nak la',
+        'tak boleh' => 'memang tak boleh',
+        'tak tahu' => 'entah la',
+        'tak apa' => 'its okay la / takpe je',
+        'kena buat' => 'perlu buat',
+        'perlu' => 'kena',
+        'guna' => 'pakai',
+        'buat' => 'buat je',
+        'lihat' => 'tengok',
+        'bagitau' => 'cakap',
+        'macam mana' => 'how eh / macam mana eh',
+        'kenapa' => 'why eh',
+        'korang semua' => 'korang',
+        'diorang semua' => 'diorang',
     ];
    
     public function process(string $rawContent): array
@@ -107,6 +205,7 @@ class Humanizer
                 $processed = $this->removeAIPhrases($reply);
                 $processed = $this->fixCommonTypos($processed);
                 $processed = $this->casualizePunctuation($processed);
+                $processed = $this->dedupeHype($processed);
                 $processed = trim($processed);
                 $processedReplies[$i] = $processed;
             }
@@ -227,10 +326,10 @@ class Humanizer
     private function casualizePunctuation(string $content): string
     {
         // Replace semicolons with periods or dashes (more casual)
-        $content = str_replace(';', ' -', $content);
+        $content = str_replace(';', '.', $content);
 
-        // Remove excessive exclamation marks
-        $content = preg_replace('/!{2,}/', '!', $content);
+        // Collapse multiple exclamation marks
+        $content = preg_replace('/!{2,}/', '.', $content);
 
         // Limit emoji usage (max 2)
         $emojiPattern = '/[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{2600}-\x{26FF}]/u';
@@ -244,6 +343,35 @@ class Humanizer
         }
 
         return $content;
+    }
+
+    /**
+     * Strip hype filler and cap exclamation marks per reply.
+     */
+    private function dedupeHype(string $content): string
+    {
+        $hypePatterns = [
+            '/\b(?:seriously|legit),?\s*/iu' => '',
+            '/\b(?:best gila|memang best|beremosi gila|puas hati)\b/iu' => '',
+            '/\b(?:vibe unik|teruja gila|penuh adrenaline|adrenaline penuh)\b/iu' => '',
+            '/\b(?:komen bawah|Komen bawah)!?\s*/iu' => '',
+            '/\bMana satu pilihan korang\?\s*/iu' => '',
+        ];
+
+        foreach ($hypePatterns as $pattern => $replacement) {
+            $content = preg_replace($pattern, $replacement, $content);
+        }
+
+        // Max one exclamation mark per reply — convert extras to periods
+        $exclamations = 0;
+        $content = preg_replace_callback('/!/', function () use (&$exclamations) {
+            $exclamations++;
+            return $exclamations <= 1 ? '!' : '.';
+        }, $content);
+
+        $content = preg_replace('/\s{2,}/', ' ', $content);
+
+        return trim($content);
     }
 
     private function enforceLength(string $content, int $maxChars): string

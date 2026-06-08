@@ -38,7 +38,7 @@ class ThreadPublisher
         $replies = $this->applyAffiliateLink($post, $replies);
 
         $hookImageUrl = $this->hookImages->resolvePublicUrl($post);
-        $this->hookImages->assertReachableByMeta($hookImageUrl);
+        $this->hookImages->validatePublicUrl($hookImageUrl);
 
         return $this->threadsClient->publishThread($account, $replies, $hookImageUrl);
     }

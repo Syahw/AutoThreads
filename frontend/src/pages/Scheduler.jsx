@@ -179,9 +179,9 @@ export default function Scheduler() {
           </div>
         )}
 
-        <p className="text-muted mt-4 text-xs">
-          Log file: <code className="code-inline">{workerLog?.path || 'backend/storage/logs/cron-publish.log'}</code>
-        </p>
+        {/* <p className="text-muted mt-4 text-xs"> */}
+        {/* Log file: <code className="code-inline">{workerLog?.path || 'backend/storage/logs/cron-publish.log'}</code> */}
+        {/* </p> */}
         <button
           type="button"
           onClick={() => setShowLog((v) => !v)}
@@ -204,7 +204,7 @@ export default function Scheduler() {
           Program: <code className="code-inline">C:\wamp64\bin\php\php8.x.x\php.exe</code> is NOT needed if you run the batch file:
         </p>
         <pre className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-900 p-4 text-xs text-slate-100 dark:border-slate-700">
-{`Action: Start a program
+          {`Action: Start a program
 Program: C:\\wamp64\\www\\AutoThreads\\backend\\cron\\run_publish.bat
 Start in: C:\\wamp64\\www\\AutoThreads\\backend
 Trigger: Every 1 minute`}
