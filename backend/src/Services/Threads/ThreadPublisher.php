@@ -48,6 +48,13 @@ class ThreadPublisher
      */
     public function extractReplies(GeneratedPost $post): array
     {
+        // Content is the source of truth — users edit `content` in the UI, not metadata.
+        $parsed = $this->humanizer->parseThreadReplies($post->content ?? '');
+
+        if (count($parsed) > 0) {
+            return array_values(array_filter(array_map('trim', $parsed)));
+        }
+
         $metadata = $post->metadata ?? [];
         $stored = $metadata['replies'] ?? [];
 
@@ -58,9 +65,9 @@ class ThreadPublisher
             )));
         }
 
-        $parsed = $this->humanizer->parseThreadReplies($post->content);
+        $content = trim($post->content ?? '');
 
-        return array_values(array_filter(array_map('trim', $parsed)));
+        return $content !== '' ? [$content] : [];
     }
 
     /**

@@ -4,6 +4,7 @@ import api from '../services/api';
 import { BarChart3, Sparkles, Calendar, TrendingUp, ArrowRight, Zap } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import StatCard from '../components/ui/StatCard';
+import { AnnouncementList } from '../components/AnnouncementBanner';
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
@@ -46,6 +47,8 @@ export default function Dashboard() {
         title="Welcome back"
         description="Overview of your content pipeline, scheduling, and Threads publishing."
       />
+
+      <AnnouncementList announcements={stats?.announcements} />
 
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import {
-  Sparkles, RefreshCw, Check, X, Loader2, Send, FileText, Pencil, Save, Link2, Calendar, ImagePlus, Trash2,
+  Sparkles, RefreshCw, Check, X, Loader2, Send, FileText, Pencil, Save, Link2, Calendar, ImagePlus, Trash2, ScanLine,
 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -27,6 +27,10 @@ export default function ContentGenerator() {
   const [config, setConfig] = useState({
     niche_id: '', category: 'general', tone: '', variations: 1, affiliate_link_id: '',
   });
+  const [referenceImage, setReferenceImage] = useState(null);
+  const [referencePreview, setReferencePreview] = useState(null);
+  const [highDetail, setHighDetail] = useState(false);
+  const [lastImageAnalysis, setLastImageAnalysis] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [scheduleAtByPost, setScheduleAtByPost] = useState({});
@@ -51,9 +55,59 @@ export default function ContentGenerator() {
     queryFn: () => api.get('/content?limit=10').then((r) => r.data.data),
   });
 
+  const { data: visionSettings } = useQuery({
+    queryKey: ['vision-settings'],
+    queryFn: () => api.get('/content/vision-settings').then((r) => r.data.data),
+  });
+
+  const buildGenerateRequest = () => {
+    const base = {
+      niche_id: config.niche_id || undefined,
+      category: config.category,
+      tone: config.tone || undefined,
+      affiliate_link_id: config.affiliate_link_id ? parseInt(config.affiliate_link_id, 10) : undefined,
+      variations: referenceImage ? 1 : config.variations,
+    };
+
+    if (!referenceImage) {
+      return { type: 'json', payload: base };
+    }
+
+    const formData = new FormData();
+    Object.entries(base).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, String(value));
+      }
+    });
+    formData.append('reference_image', referenceImage);
+    formData.append('high_detail', highDetail ? '1' : '0');
+
+    return { type: 'multipart', payload: formData };
+  };
+
   const generateMutation = useMutation({
-    mutationFn: (data) => api.post('/content/generate', data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content'] }),
+    mutationFn: () => {
+      const req = buildGenerateRequest();
+      if (req.type === 'multipart') {
+        return api.post('/content/generate', req.payload, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+      return api.post('/content/generate', req.payload);
+    },
+    onSuccess: (res) => {
+      setLastImageAnalysis(res.data?.image_analysis ?? null);
+      if (res.data?.image_analysis) {
+        setReferencePreview((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
+        setReferenceImage(null);
+        setHighDetail(false);
+      }
+      queryClient.invalidateQueries({ queryKey: ['content'] });
+    },
+    onError: () => setLastImageAnalysis(null),
   });
 
   const approveMutation = useMutation({
@@ -167,11 +221,26 @@ export default function ContentGenerator() {
     event.target.value = '';
   };
 
-  const generatePayload = {
-    ...config,
-    niche_id: config.niche_id || undefined,
-    tone: config.tone || undefined,
-    affiliate_link_id: config.affiliate_link_id ? parseInt(config.affiliate_link_id, 10) : undefined,
+  const onPickReferenceImage = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPublishError(null);
+    setReferenceImage(file);
+    setReferencePreview(URL.createObjectURL(file));
+    setConfig((prev) => ({ ...prev, variations: 1 }));
+    event.target.value = '';
+  };
+
+  const clearReferenceImage = () => {
+    if (referencePreview) URL.revokeObjectURL(referencePreview);
+    setReferenceImage(null);
+    setReferencePreview(null);
+    setHighDetail(false);
+  };
+
+  const runGenerate = () => {
+    setPublishError(null);
+    generateMutation.mutate();
   };
 
   return (
@@ -182,7 +251,7 @@ export default function ContentGenerator() {
         action={
           <button
             type="button"
-            onClick={() => generateMutation.mutate(generatePayload)}
+            onClick={runGenerate}
             disabled={generateMutation.isPending}
             className="btn-primary"
           >
@@ -191,6 +260,25 @@ export default function ContentGenerator() {
           </button>
         }
       />
+
+      {generateMutation.isError && (
+        <div className="alert-error mb-6">
+          {generateMutation.error?.response?.data?.message || 'Generation failed'}
+        </div>
+      )}
+
+      {lastImageAnalysis && (
+        <div className="alert-success mb-6">
+          Generated from image
+         
+          {lastImageAnalysis.extracted_text && (
+            <p className="mt-2 text-left text-xs opacity-90">
+              <span className="font-semibold">Extracted text:</span> {lastImageAnalysis.extracted_text.slice(0, 200)}
+              {lastImageAnalysis.extracted_text.length > 200 ? '…' : ''}
+            </p>
+          )}
+        </div>
+      )}
 
       {publishError && (
         <div className="alert-error mb-6">
@@ -248,7 +336,9 @@ export default function ContentGenerator() {
               max="5"
               value={config.variations}
               onChange={(e) => setConfig({ ...config, variations: parseInt(e.target.value, 10) || 1 })}
+              disabled={!!referenceImage}
               className="input-field"
+              title={referenceImage ? 'Variations disabled when using a reference image' : undefined}
             />
           </div>
           <div>
@@ -278,14 +368,55 @@ export default function ContentGenerator() {
             when you want a product CTA.
           </p>
         )}
+
+        <div className="panel-muted mb-5 space-y-3 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <label className="text-label flex items-center gap-1.5 text-sm font-medium">
+                <ScanLine size={14} className="text-brand-500" />
+                Reference image (optional)
+              </label>
+              <p className="text-muted mt-1 text-xs">
+                Upload a product photo, screenshot, or document. AutoThreads will analyzes it and writes a thread for your niche.
+              
+              </p>
+            </div>
+            
+          </div>
+
+          {referencePreview ? (
+            <div className="flex flex-wrap items-start gap-3">
+              <img
+                src={referencePreview}
+                alt="Reference preview"
+                className="max-h-36 max-w-full rounded-lg border border-slate-200 object-contain dark:border-slate-700"
+              />
+              <button type="button" onClick={clearReferenceImage} className="btn-secondary !py-2 !text-xs">
+                <Trash2 size={14} /> Remove reference
+              </button>
+            </div>
+          ) : (
+            <label className="btn-secondary !py-2 !text-xs inline-flex cursor-pointer items-center gap-2">
+              <ImagePlus size={14} />
+              Upload reference image
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                className="sr-only"
+                onChange={onPickReferenceImage}
+              />
+            </label>
+          )}
+        </div>
+
         <button
           type="button"
-          onClick={() => generateMutation.mutate(generatePayload)}
+          onClick={runGenerate}
           disabled={generateMutation.isPending}
           className="btn-primary"
         >
           {generateMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-          {generateMutation.isPending ? 'Generating...' : 'Generate content'}
+          {generateMutation.isPending ? 'Generating...' : referenceImage ? 'Generate from image' : 'Generate content'}
         </button>
       </div>
 
@@ -318,6 +449,9 @@ export default function ContentGenerator() {
                     {replyCount(post) != null && (
                       <span className="badge bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">{replyCount(post)} replies</span>
                     )}
+                    {post.metadata?.image_generation && (
+                      <span className="badge bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">From image</span>
+                    )}
                   </div>
                   <StatusBadge status={post.status} />
                 </div>
@@ -332,9 +466,12 @@ export default function ContentGenerator() {
                     placeholder="Keep Reply 1: / Reply 2: labels if you edit the full thread"
                   />
                 ) : (
+                  <>
                   <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 dark:text-slate-300 sm:text-base">
                     {post.content}
                   </p>
+                
+                  </>
                 )}
 
                 {(post.status === 'draft' || post.status === 'approved') && (

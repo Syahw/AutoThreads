@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 import {
   LayoutDashboard, Sparkles, Calendar, Tag,
   Link2, BarChart3, Settings, LogOut, Menu, X, Zap,
+  Shield, Users, ListOrdered, ScrollText, SlidersHorizontal,
 } from 'lucide-react';
 import clsx from 'clsx';
 import ThemeToggle from './ThemeToggle';
@@ -18,6 +19,14 @@ const navItems = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
+const adminNavItems = [
+  { to: '/admin/dashboard', icon: Shield, label: 'Admin home' },
+  { to: '/admin/users', icon: Users, label: 'Users & subscriptions' },
+  { to: '/admin/publishing', icon: ListOrdered, label: 'Publishing monitor' },
+  { to: '/admin/logs', icon: ScrollText, label: 'System logs' },
+  { to: '/admin/settings', icon: SlidersHorizontal, label: 'Platform settings' },
+];
+
 const pageTitles = {
   '/': 'Dashboard',
   '/content': 'Content Generator',
@@ -26,13 +35,19 @@ const pageTitles = {
   '/affiliates': 'Affiliate Links',
   '/analytics': 'Analytics',
   '/settings': 'Settings',
+  '/admin/dashboard': 'Admin Home',
+  '/admin/users': 'Users & Subscriptions',
+  '/admin/publishing': 'Publishing Monitor',
+  '/admin/logs': 'System Logs',
+  '/admin/settings': 'Platform Settings',
 };
 
 export default function Layout() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, isImpersonating, stopImpersonating } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const pageTitle = pageTitles[location.pathname] || 'AutoThreads';
+  const isAdmin = user?.role === 'admin' && !isImpersonating;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -107,6 +122,45 @@ export default function Layout() {
               )}
             </NavLink>
           ))}
+          {isAdmin && (
+            <>
+              <p className="mb-2 mt-4 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Admin
+              </p>
+              {adminNavItems.map(({ to, icon: Icon, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) =>
+                    clsx(
+                      'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      isActive
+                        ? 'bg-amber-500/15 text-amber-100 shadow-inner'
+                        : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'
+                    )
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-amber-400" />
+                      )}
+                      <span
+                        className={clsx(
+                          'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                          isActive ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-800/50 text-slate-400 group-hover:text-slate-200'
+                        )}
+                      >
+                        <Icon size={18} />
+                      </span>
+                      {label}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
         <div className="border-t border-slate-800/80 p-4">
@@ -157,6 +211,16 @@ export default function Layout() {
         </header>
 
         <main className="flex-1 overflow-auto bg-mesh dark:bg-mesh-dark">
+          {isImpersonating && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100 sm:px-6 lg:px-8">
+              <span>
+                Viewing as <strong>{user?.name}</strong> ({user?.email})
+              </span>
+              <button type="button" onClick={stopImpersonating} className="btn-secondary !py-1.5 !text-xs">
+                Return to admin account
+              </button>
+            </div>
+          )}
           <div className="page-shell p-4 sm:p-6 lg:p-8">
             <Outlet />
           </div>

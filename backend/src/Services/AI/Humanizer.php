@@ -187,10 +187,26 @@ class Humanizer
         'buat' => 'buat je',
         'lihat' => 'tengok',
         'bagitau' => 'cakap',
-        'macam mana' => 'how eh / macam mana eh',
+        'macam mana' => 'macam mana eh',
         'kenapa' => 'why eh',
         'korang semua' => 'korang',
         'diorang semua' => 'diorang',
+        'momen' => 'moment',
+        'merubah' => 'mengubah',
+        'berlegar' => 'yang bermain dalam fikiran',
+        'automasi' => 'automation',
+        'bantu' => 'tolong',
+        'pengpakaian' => 'pengunaan',
+        'pengpakai' => 'user',
+        'landskap' => 'landscape',
+        'bagi ramai' => 'untuk ramai',
+        'bagi' => 'untuk',
+        'berpakai' => 'boleh pakai',
+        'kegemaran' => 'favourite aku',
+        'pkorang' => 'korang',
+        'ia' => 'dia',
+        'dalam talian' => 'online',
+
     ];
    
     public function process(string $rawContent): array
@@ -198,13 +214,14 @@ class Humanizer
         // Parse thread replies
         $replies = $this->parseThreadReplies($rawContent);
 
-        if (count($replies) >= 5) {
+        if (count($replies) >= 4) {
             // Process each reply individually
             $processedReplies = [];
             foreach ($replies as $i => $reply) {
                 $processed = $this->removeAIPhrases($reply);
                 $processed = $this->fixCommonTypos($processed);
                 $processed = $this->casualizePunctuation($processed);
+                $processed = $this->removeEmDashes($processed);
                 $processed = $this->dedupeHype($processed);
                 $processed = trim($processed);
                 $processedReplies[$i] = $processed;
@@ -235,6 +252,7 @@ class Humanizer
         $content = $this->removeAIPhrases($content);
         $content = $this->fixCommonTypos($content);
         $content = $this->casualizePunctuation($content);
+        $content = $this->removeEmDashes($content);
         $content = $this->enforceLength($content, 500);
 
         $hook = $this->extractHook($content);
@@ -288,6 +306,23 @@ class Humanizer
             'terlampau' => 'terlalu',
             'lom ' => 'belum ',
             ' camtu' => ' macam tu',
+            'pkorang' => 'korang',
+            'pengunaan' => 'penggunaan',
+            'pengpakaian' => 'penggunaan',
+            'pengpakai' => 'pengguna',
+            'memang kena' => 'memang perlu',
+            'tapi kan' => 'tapi',
+            'sebenarnya la' => 'sebenarnya',
+            'overall la' => 'overall',
+            'macam mana eh' => 'macam mana',
+            'why eh' => 'kenapa',
+            'entah la' => 'tak tahu',
+            'its okay' => 'okay',
+            'takpe je' => 'takpe',
+            'nak la' => 'nak',
+            'tak nak la' => 'tak nak',
+            'buat je' => 'buat',
+            'perlu buat' => 'kena buat',
         ];
 
         foreach ($fixes as $wrong => $right) {
@@ -370,6 +405,18 @@ class Humanizer
         }, $content);
 
         $content = preg_replace('/\s{2,}/', ' ', $content);
+
+        return trim($content);
+    }
+
+    /**
+     * Replace em/en dashes with comma — they read too AI-formal for casual BM threads.
+     */
+    private function removeEmDashes(string $content): string
+    {
+        $content = preg_replace('/\s*[—–]\s*/u', ', ', $content);
+        $content = preg_replace('/,\s*,+/', ',', $content);
+        $content = preg_replace('/,\s+\./', '.', $content);
 
         return trim($content);
     }

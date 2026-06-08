@@ -4,6 +4,7 @@ namespace AutoThreads\Controllers;
 
 use AutoThreads\Models\PostingLog;
 use AutoThreads\Models\ScheduledPost;
+use AutoThreads\Models\User;
 use AutoThreads\Services\Scheduler\CronLogger;
 use AutoThreads\Services\Scheduler\CronPublishWorker;
 use AutoThreads\Services\Scheduler\PostScheduler;
@@ -22,8 +23,19 @@ class SchedulerController
 
     public function settings(Request $request, Response $response): Response
     {
+        $userId = $request->getAttribute('user_id');
+        $settings = $this->scheduler->getSettings();
+
+        $user = User::find($userId);
+        if ($user && $user->settings) {
+            $userSettings = json_decode($user->settings, true) ?: [];
+            if (!empty($userSettings['schedule_presets']) && is_array($userSettings['schedule_presets'])) {
+                $settings['schedule_presets'] = $userSettings['schedule_presets'];
+            }
+        }
+
         return $this->json($response, [
-            'data' => $this->scheduler->getSettings(),
+            'data' => $settings,
         ]);
     }
 

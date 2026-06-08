@@ -2,8 +2,6 @@ import clsx from 'clsx';
 import { Calendar, Clock } from 'lucide-react';
 import {
   buildDatetimeLocal,
-  buildHourOptions,
-  buildMinuteOptions,
   formatDatetimeLocalPreview,
   getSchedulePresets,
   isWithinPostingWindow,
@@ -21,11 +19,10 @@ export default function ScheduleDateTimePicker({
   const { date, hour, minute } = parseDatetimeLocal(value);
   const earliest = settings?.earliest_hour ?? 0;
   const latest = settings?.latest_hour ?? 23;
-  const hourOptions = buildHourOptions(earliest, latest);
-  const minuteOptions = buildMinuteOptions(5);
   const presets = getSchedulePresets(settings);
   const preview = formatDatetimeLocalPreview(value, settings?.timezone);
   const inWindow = isWithinPostingWindow(value, settings);
+  const timeValue = `${hour}:${minute}`;
 
   const update = (patch) => {
     const next = parseDatetimeLocal(value);
@@ -34,24 +31,26 @@ export default function ScheduleDateTimePicker({
 
   return (
     <div className={clsx('space-y-3', className)}>
-      <div className="flex flex-wrap gap-2">
-        {presets.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange(preset.value)}
-            className={clsx(
-              'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-              value === preset.value
-                ? 'border-brand-400 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/15 dark:text-brand-300'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-slate-500'
-            )}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
+      {presets.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {presets.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(preset.value)}
+              className={clsx(
+                'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                value === preset.value
+                  ? 'border-brand-400 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/15 dark:text-brand-300'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-slate-500'
+              )}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
         <div>
@@ -69,36 +68,23 @@ export default function ScheduleDateTimePicker({
           />
         </div>
 
-        <div className="sm:min-w-[11rem]">
+        <div className="sm:min-w-[9rem]">
           <label className="text-label mb-1.5 flex items-center gap-1.5 text-xs font-medium">
             <Clock size={12} className="text-brand-500 dark:text-brand-400" />
             Time
           </label>
-          <div className="flex items-center gap-2">
-            <select
-              value={hour}
-              disabled={disabled}
-              onChange={(e) => update({ hour: e.target.value })}
-              className="select-field min-w-0 flex-1"
-              aria-label="Hour"
-            >
-              {hourOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <span className="text-muted font-semibold">:</span>
-            <select
-              value={minute}
-              disabled={disabled}
-              onChange={(e) => update({ minute: e.target.value })}
-              className="select-field w-20 shrink-0"
-              aria-label="Minute"
-            >
-              {minuteOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
+          <input
+            type="time"
+            value={timeValue}
+            disabled={disabled}
+            step={60}
+            onChange={(e) => {
+              const [h, m] = (e.target.value || '12:00').split(':');
+              update({ hour: h, minute: m });
+            }}
+            className="input-field w-full [color-scheme:light] dark:[color-scheme:dark]"
+            aria-label="Time"
+          />
         </div>
       </div>
 

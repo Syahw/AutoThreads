@@ -16,7 +16,9 @@ use AutoThreads\Controllers\TopicController;
 use AutoThreads\Controllers\ContentController;
 use AutoThreads\Controllers\SchedulerController;
 use AutoThreads\Controllers\AffiliateController;
+use AutoThreads\Controllers\AdminController;
 use AutoThreads\Controllers\AnalyticsController;
+use AutoThreads\Middleware\AdminMiddleware;
 use AutoThreads\Controllers\SettingsController;
 use AutoThreads\Controllers\ThreadsController;
 use AutoThreads\Controllers\MediaController;
@@ -83,6 +85,7 @@ $app->group('/api/v1', function (RouteCollectorProxy $group) {
 
         // Content Generation
         $protected->get('/content', [ContentController::class, 'index']);
+        $protected->get('/content/vision-settings', [ContentController::class, 'visionSettings']);
         $protected->post('/content/generate', [ContentController::class, 'generate']);
         $protected->post('/content/{id}/regenerate', [ContentController::class, 'regenerate']);
         $protected->put('/content/{id}', [ContentController::class, 'update']);
@@ -127,6 +130,35 @@ $app->group('/api/v1', function (RouteCollectorProxy $group) {
         $protected->put('/settings', [SettingsController::class, 'update']);
         $protected->get('/settings/blacklist', [SettingsController::class, 'blacklist']);
         $protected->post('/settings/blacklist', [SettingsController::class, 'addBlacklistWord']);
+
+        // Admin (requires role=admin)
+        $protected->group('/admin', function (RouteCollectorProxy $admin) {
+            $admin->get('/dashboard', [AdminController::class, 'dashboard']);
+            $admin->get('/users', [AdminController::class, 'users']);
+            $admin->get('/users/{id}', [AdminController::class, 'showUser']);
+            $admin->put('/users/{id}', [AdminController::class, 'updateUser']);
+            $admin->post('/users/{id}/suspend', [AdminController::class, 'suspendUser']);
+            $admin->post('/users/{id}/ban', [AdminController::class, 'banUser']);
+            $admin->post('/users/{id}/activate', [AdminController::class, 'activateUser']);
+            $admin->post('/users/{id}/reset-quota', [AdminController::class, 'resetQuota']);
+            $admin->post('/users/{id}/impersonate', [AdminController::class, 'impersonate']);
+            $admin->get('/subscriptions', [AdminController::class, 'subscriptions']);
+            $admin->put('/subscriptions/{id}', [AdminController::class, 'updateSubscription']);
+            $admin->get('/queue', [AdminController::class, 'queue']);
+            $admin->post('/queue/{id}/retry', [AdminController::class, 'retryQueueItem']);
+            $admin->post('/queue/{id}/cancel', [AdminController::class, 'cancelQueueItem']);
+            $admin->post('/queue/{id}/force-publish', [AdminController::class, 'forcePublish']);
+            $admin->get('/worker', [AdminController::class, 'worker']);
+            $admin->post('/worker/run', [AdminController::class, 'runWorker']);
+            $admin->get('/ai-logs', [AdminController::class, 'aiLogs']);
+            $admin->get('/system-logs', [AdminController::class, 'systemLogs']);
+            $admin->get('/settings', [AdminController::class, 'getSettings']);
+            $admin->put('/settings', [AdminController::class, 'updateSettings']);
+            $admin->post('/announcements', [AdminController::class, 'saveAnnouncement']);
+            $admin->delete('/announcements/{id}', [AdminController::class, 'deleteAnnouncement']);
+            $admin->get('/threads-accounts', [AdminController::class, 'threadsAccounts']);
+            $admin->post('/threads-accounts/{id}/disconnect', [AdminController::class, 'disconnectThreadsAccount']);
+        })->add(new AdminMiddleware());
 
     })->add(new AuthMiddleware());
 });

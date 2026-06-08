@@ -69,7 +69,7 @@ class CronPublishWorker
     /**
      * @return array<string, mixed>
      */
-    private function processOne(ScheduledPost $scheduledPost): array
+    public function processOne(ScheduledPost $scheduledPost): array
     {
         $startTime = microtime(true);
         $detail = [

@@ -111,7 +111,7 @@ export default function Scheduler() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Terminal size={18} className="text-brand-600 dark:text-brand-400" />
-            <h2 className="text-heading text-lg font-semibold">Publish worker status</h2>
+            <h2 className="text-heading text-lg font-semibold">Schedule status</h2>
           </div>
           <span
             className={`badge ${cronOk ? 'badge-approved' : 'badge-scheduled'}`}
@@ -179,39 +179,8 @@ export default function Scheduler() {
           </div>
         )}
 
-        {/* <p className="text-muted mt-4 text-xs"> */}
-        {/* Log file: <code className="code-inline">{workerLog?.path || 'backend/storage/logs/cron-publish.log'}</code> */}
-        {/* </p> */}
-        <button
-          type="button"
-          onClick={() => setShowLog((v) => !v)}
-          className="text-brand-600 dark:text-brand-400 mt-2 text-xs font-semibold hover:underline"
-        >
-          {showLog ? 'Hide' : 'Show'} cron log
-        </button>
-        {showLog && (
-          <pre className="mt-3 max-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-900 p-4 text-xs leading-relaxed text-slate-100 dark:border-slate-700">
-            {workerLog?.lines?.length
-              ? workerLog.lines.join('\n')
-              : '(empty — run run_publish.bat once or wait for Task Scheduler)'}
-          </pre>
-        )}
-      </div>
-
-      <div className="card mb-6 p-6">
-        <h2 className="text-heading mb-2 text-lg font-semibold">Windows Task Scheduler</h2>
-        <p className="text-muted mb-3 text-sm">
-          Program: <code className="code-inline">C:\wamp64\bin\php\php8.x.x\php.exe</code> is NOT needed if you run the batch file:
-        </p>
-        <pre className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-900 p-4 text-xs text-slate-100 dark:border-slate-700">
-          {`Action: Start a program
-Program: C:\\wamp64\\www\\AutoThreads\\backend\\cron\\run_publish.bat
-Start in: C:\\wamp64\\www\\AutoThreads\\backend
-Trigger: Every 1 minute`}
-        </pre>
-        <p className="text-muted mt-3 text-xs">
-          Test manually: open CMD → <code className="code-inline">cd backend</code> → <code className="code-inline">cron\\run_publish.bat</code>
-        </p>
+       
+       
       </div>
 
       <div className="card overflow-hidden mb-6">

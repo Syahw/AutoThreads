@@ -57,21 +57,57 @@
       dark:hover:border-brand-500/30 dark:hover:shadow-glow;
   }
 
+  /* Shared base — do not @apply input-field from select rules (circular dependency). */
+  .field-base {
+    @apply w-full rounded-xl border border-slate-200/90 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm
+      ring-1 ring-transparent placeholder:text-slate-400 transition-all duration-200
+      hover:border-slate-300 hover:shadow-md
+      focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25 focus:shadow-md
+      disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-slate-50 disabled:hover:border-slate-200/90 disabled:hover:shadow-sm
+      dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-100 dark:placeholder:text-slate-500
+      dark:hover:border-slate-500 dark:focus:border-brand-500 dark:focus:ring-brand-500/30
+      dark:disabled:bg-slate-800/50;
+  }
+
+  .input,
   .input-field {
-    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm
-      placeholder:text-slate-400 transition-colors
-      focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20
-      dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500
-      dark:focus:border-brand-500 dark:focus:ring-brand-500/30;
+    @apply field-base;
   }
 
+  .input-sm {
+    @apply !px-2.5 !py-1.5 !text-xs;
+  }
+
+  textarea.input,
+  textarea.input-field {
+    @apply min-h-[100px] resize-y leading-relaxed;
+  }
+
+  select.input,
+  select.input-field,
   .select-field {
-    @apply input-field appearance-none bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10;
+    @apply field-base cursor-pointer appearance-none bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
   }
 
+  .dark select.input,
+  .dark select.input-field,
   .dark .select-field {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  }
+
+  input[type='checkbox'].checkbox-field {
+    @apply h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 shadow-sm
+      transition-colors focus:ring-2 focus:ring-brand-500/30 focus:ring-offset-0
+      dark:border-slate-600 dark:bg-slate-800 dark:text-brand-500;
+  }
+
+  .form-label {
+    @apply mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300;
+  }
+
+  .form-group {
+    @apply space-y-1.5;
   }
 
   .btn {
@@ -91,6 +127,16 @@
 
   .btn-ghost {
     @apply btn text-slate-600 hover:bg-slate-100 focus:ring-slate-400 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+
+  .btn-icon {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow
+      dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-700;
+  }
+
+  .btn-icon-success {
+    @apply btn-icon text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50
+      dark:text-emerald-400 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/40;
   }
 
   .btn-danger {

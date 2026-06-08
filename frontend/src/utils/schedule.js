@@ -1,19 +1,21 @@
 const pad = (n) => String(n).padStart(2, '0');
 
+/** Built-in quick picks when the user has not configured custom presets in Settings. */
+export const DEFAULT_SCHEDULE_PRESETS = [
+  { id: '1h', label: 'In 1 hour', type: 'minutes_from_now', minutes: 60 },
+  { id: 'midnight', label: 'Tonight 12:00 AM', type: 'next_midnight', hour: 0, minute: 0 },
+  { id: 'tomorrow-am', label: 'Tomorrow 9:00 AM', type: 'tomorrow_at', hour: 9, minute: 0 },
+  { id: 'tomorrow-pm', label: 'Tomorrow 6:00 PM', type: 'tomorrow_at', hour: 18, minute: 0 },
+];
+
 /**
- * Default datetime-local value: 1 hour ahead, rounded to next 5 minutes.
+ * Default datetime-local value: 1 hour ahead (exact minute, not rounded).
  */
 export function defaultScheduleDatetimeLocal() {
   const d = new Date();
   d.setHours(d.getHours() + 1);
-  const minutes = Math.ceil(d.getMinutes() / 5) * 5;
-  d.setMinutes(minutes);
   d.setSeconds(0);
   d.setMilliseconds(0);
-  if (d.getMinutes() >= 60) {
-    d.setHours(d.getHours() + 1);
-    d.setMinutes(0);
-  }
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
@@ -31,7 +33,7 @@ export function parseDatetimeLocal(value) {
   const [hour = '12', minute = '00'] = (time || '').split(':');
   return {
     date: date || todayDateString(),
-    hour: String(parseInt(hour, 10) || 0),
+    hour: pad(parseInt(hour, 10) || 0),
     minute: pad(parseInt(minute, 10) || 0).slice(0, 2),
   };
 }
@@ -110,22 +112,6 @@ export function formatDatetimeLocalPreview(datetimeLocal, timeZone) {
   return formatScheduledAt(payload, timeZone);
 }
 
-export function buildHourOptions(earliestHour = 0, latestHour = 23) {
-  const options = [];
-  for (let h = earliestHour; h <= latestHour; h += 1) {
-    options.push({ value: String(h), label: formatHour12(h, 0) });
-  }
-  return options;
-}
-
-export function buildMinuteOptions(step = 5) {
-  const options = [];
-  for (let m = 0; m < 60; m += step) {
-    options.push({ value: pad(m), label: pad(m) });
-  }
-  return options;
-}
-
 function clampHour(hour, earliest, latest) {
   return Math.min(latest, Math.max(earliest, hour));
 }
@@ -141,46 +127,97 @@ function nextMidnightDatetimeLocal() {
   });
 }
 
-export function getSchedulePresets(settings) {
+function tomorrowDateString() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Resolve a single preset config into a datetime-local string.
+ */
+export function resolveSchedulePreset(preset, settings = null) {
   const earliest = settings?.earliest_hour ?? 0;
   const latest = settings?.latest_hour ?? 23;
+  const type = preset?.type || 'minutes_from_now';
 
-  const inOneHour = defaultScheduleDatetimeLocal();
-
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowDate = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}`;
-
-  const morningHour = clampHour(9, earliest, latest);
-  const eveningHour = clampHour(18, earliest, latest);
-  const midnightHour = clampHour(0, earliest, latest);
-
-  const presets = [
-    { id: '1h', label: 'In 1 hour', value: inOneHour },
-  ];
-
-  if (midnightHour === 0) {
-    presets.push({
-      id: 'midnight',
-      label: 'Tonight 12:00 AM',
-      value: nextMidnightDatetimeLocal(),
+  if (type === 'minutes_from_now') {
+    const minutes = Math.max(1, parseInt(preset.minutes, 10) || 60);
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + minutes);
+    d.setSeconds(0);
+    d.setMilliseconds(0);
+    return buildDatetimeLocal({
+      date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      hour: d.getHours(),
+      minute: d.getMinutes(),
     });
   }
 
-  presets.push(
-    {
-      id: 'tomorrow-am',
-      label: `Tomorrow ${formatHour12(morningHour, 0)}`,
-      value: buildDatetimeLocal({ date: tomorrowDate, hour: morningHour, minute: 0 }),
-    },
-    {
-      id: 'tomorrow-pm',
-      label: `Tomorrow ${formatHour12(eveningHour, 0)}`,
-      value: buildDatetimeLocal({ date: tomorrowDate, hour: eveningHour, minute: 0 }),
-    },
-  );
+  if (type === 'next_midnight') {
+    const hour = clampHour(parseInt(preset.hour, 10) || 0, earliest, latest);
+    if (hour === 0) {
+      return nextMidnightDatetimeLocal();
+    }
+    const d = new Date();
+    d.setHours(hour, parseInt(preset.minute, 10) || 0, 0, 0);
+    if (d <= new Date()) {
+      d.setDate(d.getDate() + 1);
+    }
+    return buildDatetimeLocal({
+      date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      hour: d.getHours(),
+      minute: d.getMinutes(),
+    });
+  }
 
-  return presets;
+  if (type === 'today_at') {
+    const hour = clampHour(parseInt(preset.hour, 10) || 9, earliest, latest);
+    const minute = parseInt(preset.minute, 10) || 0;
+    const d = new Date();
+    d.setHours(hour, minute, 0, 0);
+    if (d <= new Date()) {
+      d.setDate(d.getDate() + 1);
+    }
+    return buildDatetimeLocal({
+      date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      hour: d.getHours(),
+      minute: d.getMinutes(),
+    });
+  }
+
+  if (type === 'tomorrow_at') {
+    const hour = clampHour(parseInt(preset.hour, 10) || 9, earliest, latest);
+    const minute = parseInt(preset.minute, 10) || 0;
+    return buildDatetimeLocal({
+      date: tomorrowDateString(),
+      hour,
+      minute,
+    });
+  }
+
+  return defaultScheduleDatetimeLocal();
+}
+
+export function getEffectiveSchedulePresets(settings) {
+  const custom = settings?.schedule_presets;
+  if (Array.isArray(custom) && custom.length > 0) {
+    return custom;
+  }
+  return DEFAULT_SCHEDULE_PRESETS;
+}
+
+export function getSchedulePresets(settings) {
+  const configs = getEffectiveSchedulePresets(settings);
+
+  return configs
+    .filter((preset) => preset?.label && preset?.type)
+    .map((preset, index) => ({
+      id: preset.id || `preset-${index}`,
+      label: preset.label,
+      value: resolveSchedulePreset(preset, settings),
+      config: preset,
+    }));
 }
 
 export function isWithinPostingWindow(datetimeLocal, settings) {
@@ -188,4 +225,38 @@ export function isWithinPostingWindow(datetimeLocal, settings) {
   const { hour } = parseDatetimeLocal(datetimeLocal);
   const h = parseInt(hour, 10);
   return h >= settings.earliest_hour && h <= settings.latest_hour;
+}
+
+export const SCHEDULE_PRESET_TYPES = [
+  { value: 'minutes_from_now', label: 'Minutes from now' },
+  { value: 'today_at', label: 'Today at time (rolls to tomorrow if past)' },
+  { value: 'tomorrow_at', label: 'Tomorrow at time' },
+  { value: 'next_midnight', label: 'Next midnight (12:00 AM)' },
+];
+
+export function createEmptySchedulePreset() {
+  return {
+    id: `custom-${Date.now()}`,
+    label: 'Custom time',
+    type: 'tomorrow_at',
+    hour: 9,
+    minute: 0,
+  };
+}
+
+export function normalizeSchedulePresetsForSave(presets) {
+  if (!Array.isArray(presets)) return [];
+  return presets
+    .filter((p) => p?.label?.trim() && p?.type)
+    .map((p, index) => ({
+      id: p.id || `preset-${index}`,
+      label: p.label.trim(),
+      type: p.type,
+      ...(p.type === 'minutes_from_now'
+        ? { minutes: Math.max(1, parseInt(p.minutes, 10) || 60) }
+        : {
+            hour: Math.min(23, Math.max(0, parseInt(p.hour, 10) || 0)),
+            minute: Math.min(59, Math.max(0, parseInt(p.minute, 10) || 0)),
+          }),
+    }));
 }

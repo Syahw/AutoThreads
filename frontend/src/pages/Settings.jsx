@@ -5,6 +5,7 @@ import api from '../services/api';
 import { Link2, Loader2, CheckCircle2, AlertCircle, Unplug, Shield } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import ThemeToggle from '../components/ThemeToggle';
+import SchedulePresetsEditor from '../components/settings/SchedulePresetsEditor';
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -174,6 +175,8 @@ export default function Settings() {
             Use ngrok for WAMP and add the callback URL in Meta OAuth settings.
           </p>
         </div>
+
+        <SchedulePresetsEditor />
       </div>
     </div>
   );

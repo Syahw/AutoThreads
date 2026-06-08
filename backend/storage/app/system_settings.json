@@ -1,0 +1,48 @@
+{
+    "general": {
+        "site_name": "AutoThreads",
+        "timezone": "Asia\/Kuala_Lumpur"
+    },
+    "scheduler": {
+        "earliest_hour": 0,
+        "latest_hour": 23,
+        "max_retries": 3,
+        "worker_frequency_minutes": 1
+    },
+    "ai": {
+        "default_model": "gpt-4o-mini",
+        "max_tokens": 2000,
+        "daily_user_limit": 50
+    },
+    "plans": {
+        "free": {
+            "posts_per_month": 10
+        },
+        "starter": {
+            "posts_per_month": 50
+        },
+        "pro": {
+            "posts_per_month": 500
+        },
+        "enterprise": {
+            "posts_per_month": 5000
+        }
+    },
+    "features": {
+        "ai_generation": true,
+        "bulk_scheduling": true,
+        "image_upload": true,
+        "analytics": true,
+        "affiliate_templates": true
+    },
+    "announcements": [
+        {
+            "id": "0d1cea86ee613b2c",
+            "title": "AutoThreads Version 1.0 is Now Live !",
+            "message": "Please feel free to contact the administrator if there is any problem , or refer the help and guide on how to use autothreads the correct way",
+            "target": "all",
+            "active": true,
+            "created_at": "2026-06-09T00:29:07+08:00"
+        }
+    ]
+}

@@ -7,19 +7,26 @@ use AutoThreads\Models\ThreadsAccount;
 use AutoThreads\Services\AI\ContentGenerator;
 use AutoThreads\Services\AI\Humanizer;
 use AutoThreads\Services\Media\HookImageStorage;
+use AutoThreads\Services\Media\ImagePreprocessor;
 use AutoThreads\Services\Threads\ThreadPublisher;
+use AutoThreads\Config\Bootstrap;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use Psr\Http\Message\UploadedFileInterface;
 
 class ContentController
 {
     private ContentGenerator $generator;
     private HookImageStorage $hookImages;
+    private ImagePreprocessor $imagePreprocessor;
 
     public function __construct()
     {
-        $this->generator = new ContentGenerator();
+        $container = Bootstrap::init();
+        $logger = $container->get('logger');
+        $this->generator = new ContentGenerator($logger);
         $this->hookImages = new HookImageStorage();
+        $this->imagePreprocessor = new ImagePreprocessor($this->generator->getImageConfig());
     }
 
     public function index(Request $request, Response $response): Response
@@ -54,20 +61,28 @@ class ContentController
         ]);
     }
 
+    public function visionSettings(Request $request, Response $response): Response
+    {
+        return $this->json($response, [
+            'data' => $this->generator->getImageConfig()->toPublicArray(),
+        ]);
+    }
+
     public function generate(Request $request, Response $response): Response
     {
         $userId = $request->getAttribute('user_id');
-        $data = $request->getParsedBody();
+        $uploaded = $this->collectReferenceImages($request);
 
-        $config = [
-            'user_id' => $userId,
-            'niche_id' => !empty($data['niche_id']) ? $data['niche_id'] : null,
-            'topic_id' => !empty($data['topic_id']) ? $data['topic_id'] : null,
-            'affiliate_link_id' => !empty($data['affiliate_link_id']) ? $data['affiliate_link_id'] : null,
-            'category' => $data['category'] ?? 'general',
-            'tone' => !empty($data['tone']) ? $data['tone'] : null,
-            'variations' => (int) ($data['variations'] ?? 1),
-        ];
+        if ($uploaded !== []) {
+            return $this->generateWithImages($request, $response, $userId, $uploaded);
+        }
+
+        $data = $request->getParsedBody();
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $config = $this->buildGenerationConfig($userId, $data);
 
         try {
             if (($config['variations'] ?? 1) > 1) {
@@ -83,12 +98,104 @@ class ContentController
                 'message' => 'Content generated',
                 'data' => $this->serializePost($post),
             ], 201);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json($response, ['error' => true, 'message' => $e->getMessage()], 422);
         } catch (\Exception $e) {
             return $this->json($response, [
                 'error' => true,
                 'message' => 'Generation failed: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * @param  list<UploadedFileInterface>  $uploaded
+     */
+    private function generateWithImages(
+        Request $request,
+        Response $response,
+        int $userId,
+        array $uploaded
+    ): Response {
+        $data = $request->getParsedBody();
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $highDetail = filter_var($data['high_detail'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $config = $this->buildGenerationConfig($userId, $data);
+        $config['high_detail'] = $highDetail;
+
+        if (($config['variations'] ?? 1) > 1) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Variations are not supported with reference images. Use variations=1.',
+            ], 422);
+        }
+
+        try {
+            $processed = $this->imagePreprocessor->processUploads($uploaded, [
+                'high_detail' => $highDetail,
+            ]);
+
+            $result = $this->generator->generateWithImages($config, $processed);
+
+            return $this->json($response, [
+                'message' => 'Content generated from image',
+                'data' => $this->serializePost($result['post']),
+                'image_analysis' => $result['image_analysis'],
+            ], 201);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json($response, ['error' => true, 'message' => $e->getMessage()], 422);
+        } catch (\RuntimeException $e) {
+            $status = str_contains(strtolower($e->getMessage()), 'rate limit') ? 429 : 502;
+            return $this->json($response, ['error' => true, 'message' => $e->getMessage()], $status);
+        } catch (\Exception $e) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Image generation failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function buildGenerationConfig(int $userId, array $data): array
+    {
+        return [
+            'user_id' => $userId,
+            'niche_id' => !empty($data['niche_id']) ? (int) $data['niche_id'] : null,
+            'topic_id' => !empty($data['topic_id']) ? (int) $data['topic_id'] : null,
+            'affiliate_link_id' => !empty($data['affiliate_link_id']) ? (int) $data['affiliate_link_id'] : null,
+            'category' => $data['category'] ?? 'general',
+            'tone' => !empty($data['tone']) ? $data['tone'] : null,
+            'variations' => (int) ($data['variations'] ?? 1),
+            'high_detail' => filter_var($data['high_detail'] ?? false, FILTER_VALIDATE_BOOLEAN),
+        ];
+    }
+
+    /**
+     * @return list<UploadedFileInterface>
+     */
+    private function collectReferenceImages(Request $request): array
+    {
+        $files = $request->getUploadedFiles();
+        $collected = [];
+
+        if (isset($files['reference_image']) && $files['reference_image'] instanceof UploadedFileInterface) {
+            if ($files['reference_image']->getError() !== UPLOAD_ERR_NO_FILE) {
+                $collected[] = $files['reference_image'];
+            }
+        }
+
+        if (isset($files['reference_images']) && is_array($files['reference_images'])) {
+            foreach ($files['reference_images'] as $file) {
+                if ($file instanceof UploadedFileInterface && $file->getError() !== UPLOAD_ERR_NO_FILE) {
+                    $collected[] = $file;
+                }
+            }
+        }
+
+        return $collected;
     }
 
     public function regenerate(Request $request, Response $response, array $args): Response
@@ -150,16 +257,20 @@ class ContentController
             $updates['affiliate_link_id'] = $data['affiliate_link_id'] ?: null;
         }
 
-        if (!empty($updates['content'])) {
+        if (isset($updates['content'])) {
             $humanizer = new Humanizer();
             $parsed = $humanizer->parseThreadReplies($updates['content']);
-            if (count($parsed) >= 5) {
-                $metadata = $post->metadata ?? [];
+            $metadata = $post->metadata ?? [];
+
+            if (count($parsed) > 0) {
                 $metadata['replies'] = $parsed;
-                $metadata['thread_format'] = true;
+                $metadata['thread_format'] = count($parsed) > 1;
                 $updates['metadata'] = $metadata;
                 $updates['hook'] = $updates['hook'] ?? ($parsed[0] ?? $post->hook);
                 $updates['cta'] = $updates['cta'] ?? ($parsed[array_key_last($parsed)] ?? $post->cta);
+            } else {
+                unset($metadata['replies']);
+                $updates['metadata'] = $metadata;
             }
         }
 
