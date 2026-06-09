@@ -1,3 +1,5 @@
+import { formatDateTime } from './date';
+
 const pad = (n) => String(n).padStart(2, '0');
 
 /** Built-in quick picks when the user has not configured custom presets in Settings. */
@@ -52,58 +54,19 @@ export function toSchedulerPayload(datetimeLocal) {
 }
 
 /**
- * Parse API/DB datetime without treating it as UTC (fixes +8h display bug).
- */
-export function parseNaiveDatetime(value) {
-  if (!value) return null;
-  const normalized = String(value).trim().replace('T', ' ');
-  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
-  if (!match) return null;
-  return {
-    year: Number(match[1]),
-    month: Number(match[2]),
-    day: Number(match[3]),
-    hour: Number(match[4]),
-    minute: Number(match[5]),
-  };
-}
-
-function formatHour12(hour, minute) {
-  const h = hour % 12 || 12;
-  const ampm = hour < 12 ? 'AM' : 'PM';
-  return `${h}:${pad(minute)} ${ampm}`;
-}
-
-/**
  * Display wall-clock time exactly as stored (scheduler timezone), not shifted to UTC.
  */
-export function formatScheduledAt(value, timeZone) {
+export function formatScheduledAt(value) {
   if (!value) return '';
 
   if (typeof value === 'object') {
-    if (value.scheduled_at_display) {
-      const tz = value.scheduled_at_timezone || timeZone;
-      const suffix = tz ? ` (${tz})` : '';
-      return `${value.scheduled_at_display}${suffix}`;
-    }
     if (value.scheduled_at) {
-      return formatScheduledAt(value.scheduled_at, value.scheduled_at_timezone || timeZone);
+      return formatScheduledAt(value.scheduled_at);
     }
     return '';
   }
 
-  const parts = parseNaiveDatetime(value);
-  if (!parts) {
-    return String(value);
-  }
-
-  const date = new Date(parts.year, parts.month - 1, parts.day);
-  const dayName = date.toLocaleDateString(undefined, { weekday: 'short' });
-  const month = date.toLocaleDateString(undefined, { month: 'short' });
-  const time = formatHour12(parts.hour, parts.minute);
-  const suffix = timeZone ? ` (${timeZone})` : '';
-
-  return `${dayName}, ${parts.day} ${month} ${parts.year}, ${time}${suffix}`;
+  return formatDateTime(value, '');
 }
 
 export function formatDatetimeLocalPreview(datetimeLocal, timeZone) {

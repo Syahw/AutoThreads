@@ -45,7 +45,7 @@ class ThreadsClient
         $params = http_build_query([
             'client_id' => $_ENV['THREADS_APP_ID'],
             'redirect_uri' => $_ENV['THREADS_REDIRECT_URI'],
-            'scope' => 'threads_basic,threads_content_publish,threads_manage_replies,threads_manage_insights',
+            'scope' => 'threads_basic,threads_content_publish,threads_manage_replies,threads_manage_insights,threads_delete',
             'response_type' => 'code',
             'state' => $state,
         ]);
@@ -336,6 +336,52 @@ class ThreadsClient
             'creation_id' => $containerId,
             'access_token' => $account->access_token,
         ]);
+    }
+
+    /**
+     * Delete a single published Threads media object.
+     *
+     * @see https://developers.facebook.com/docs/threads/posts/delete-posts/
+     */
+    public function deletePost(ThreadsAccount $account, string $mediaId): array
+    {
+        try {
+            $response = $this->http->delete("{$this->baseUrl}/{$mediaId}", [
+                'query' => ['access_token' => $account->access_token],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true) ?? [];
+        } catch (ClientException $e) {
+            throw new \RuntimeException($this->formatApiError($e), 0, $e);
+        }
+    }
+
+    /**
+     * Delete a published reply chain (replies first, then root).
+     *
+     * @param  list<string>  $postIds
+     * @return array{deleted: list<string>, errors: list<array{id: string, error: string}>}
+     */
+    public function deleteThreadPosts(ThreadsAccount $account, array $postIds): array
+    {
+        $deleted = [];
+        $errors = [];
+
+        foreach (array_reverse(array_values($postIds)) as $mediaId) {
+            if ($mediaId === '') {
+                continue;
+            }
+
+            try {
+                $this->deletePost($account, $mediaId);
+                $deleted[] = $mediaId;
+                usleep(500_000);
+            } catch (\Throwable $e) {
+                $errors[] = ['id' => $mediaId, 'error' => $e->getMessage()];
+            }
+        }
+
+        return ['deleted' => $deleted, 'errors' => $errors];
     }
 
     /**

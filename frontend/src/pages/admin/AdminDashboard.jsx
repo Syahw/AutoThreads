@@ -11,6 +11,7 @@ import api from '../../services/api';
 import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
+import { formatDateTime } from '../../utils/date';
 
 const TARGETS = [
   { value: 'all', label: 'All users', icon: UsersRound, description: 'Everyone on the platform' },
@@ -284,7 +285,7 @@ export default function AdminDashboard() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted">Last run</span>
-              <span className="text-subheading font-medium">{worker.last_run ?? 'Never'}</span>
+              <span className="text-subheading font-medium">{worker.last_run ? formatDateTime(worker.last_run) : 'Never'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted">Published today</span>

@@ -6,6 +6,7 @@ import { Link2, Loader2, CheckCircle2, AlertCircle, Unplug, Shield } from 'lucid
 import PageHeader from '../components/ui/PageHeader';
 import ThemeToggle from '../components/ThemeToggle';
 import SchedulePresetsEditor from '../components/settings/SchedulePresetsEditor';
+import { formatDateTime } from '../utils/date';
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -126,7 +127,7 @@ export default function Settings() {
                     <div>
                       <p className="text-heading font-semibold">@{account.username}</p>
                       <p className="text-muted mt-1 text-xs">
-                        Connected {account.connected_at ? new Date(account.connected_at).toLocaleString() : '—'}
+                        Connected {account.connected_at ? formatDateTime(account.connected_at) : '—'}
                       </p>
                       <p
                         className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${

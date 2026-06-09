@@ -9,6 +9,7 @@ import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
 import StatusBadge from '../components/ui/StatusBadge';
 import { formatScheduledAt } from '../utils/schedule';
+import { formatDateTime } from '../utils/date';
 
 export default function Scheduler() {
   const queryClient = useQueryClient();
@@ -123,7 +124,7 @@ export default function Scheduler() {
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div className="panel-muted p-3">
             <dt className="text-muted text-xs">Server time</dt>
-            <dd className="text-heading font-semibold">{diagnostics?.server_now ?? '—'}</dd>
+            <dd className="text-heading font-semibold">{diagnostics?.server_now ? formatDateTime(diagnostics.server_now) : '—'}</dd>
             <dd className="text-muted text-xs">{diagnostics?.timezone}</dd>
           </div>
           <div className="panel-muted p-3">
@@ -220,7 +221,7 @@ export default function Scheduler() {
                   <div className="text-muted mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     <span className="flex items-center gap-1">
                       <Clock size={12} />
-                      {formatScheduledAt(item, settings?.timezone)}
+                      {formatScheduledAt(item)}
                     </span>
                     {(item.threads_account?.username || item.threadsAccount?.username) && (
                       <span>@{item.threads_account?.username || item.threadsAccount?.username}</span>

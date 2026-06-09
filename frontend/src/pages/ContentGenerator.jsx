@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import {
-  Sparkles, RefreshCw, Check, X, Loader2, Send, FileText, Pencil, Save, Link2, Calendar, ImagePlus, Trash2, ScanLine,
+  Sparkles, RefreshCw, Check, X, Loader2, Send, FileText, Pencil, Save, Link2, Calendar, ImagePlus, Trash2, ScanLine, Undo2,
 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
 import EmptyState from '../components/ui/EmptyState';
 import ScheduleDateTimePicker from '../components/ui/ScheduleDateTimePicker';
 import { defaultScheduleDatetimeLocal, isWithinPostingWindow, toSchedulerPayload } from '../utils/schedule';
+import { confirmDelete, confirmPostedDelete, confirmRevertToDraft } from '../utils/swal';
 
 const categories = [
   'story', 'product_recommendation', 'comparison', 'productivity_tip',
@@ -115,9 +116,33 @@ export default function ContentGenerator() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content'] }),
   });
 
-  const rejectMutation = useMutation({
-    mutationFn: (id) => api.delete(`/content/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content'] }),
+  const deleteMutation = useMutation({
+    mutationFn: ({ id, deleteFromThreads = false }) =>
+      api.delete(`/content/${id}`, { data: { delete_from_threads: deleteFromThreads } }),
+    onSuccess: () => {
+      setEditingId(null);
+      setEditContent('');
+      setPublishError(null);
+      queryClient.invalidateQueries({ queryKey: ['content'] });
+      queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+    },
+    onError: (err) => {
+      setPublishError(err.response?.data?.message || 'Delete failed');
+    },
+  });
+
+  const unapproveMutation = useMutation({
+    mutationFn: (id) => api.put(`/content/${id}/unapprove`),
+    onSuccess: () => {
+      setEditingId(null);
+      setEditContent('');
+      setPublishError(null);
+      queryClient.invalidateQueries({ queryKey: ['content'] });
+      queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+    },
+    onError: (err) => {
+      setPublishError(err.response?.data?.message || 'Could not revert to draft');
+    },
   });
 
   const regenerateMutation = useMutation({
@@ -202,9 +227,40 @@ export default function ContentGenerator() {
     setEditContent(post.content ?? '');
   };
 
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditContent('');
+  };
+
   const saveEdit = (postId) => {
     updateMutation.mutate({ id: postId, content: editContent });
   };
+
+  const handleUnapprove = async (post) => {
+    const confirmed = await confirmRevertToDraft(post.status === 'scheduled');
+    if (!confirmed) return;
+    unapproveMutation.mutate(post.id);
+  };
+
+  const handleDelete = async (post) => {
+    if (post.status === 'posted') {
+      const choice = await confirmPostedDelete();
+      if (!choice.proceed) return;
+      deleteMutation.mutate({ id: post.id, deleteFromThreads: choice.deleteFromThreads });
+      return;
+    }
+
+    const text = post.status === 'scheduled'
+      ? 'This will delete the post and cancel its scheduled publish.'
+      : 'This cannot be undone.';
+    const confirmed = await confirmDelete(text);
+    if (!confirmed) return;
+    deleteMutation.mutate({ id: post.id });
+  };
+
+  const isDeleting = deleteMutation.isPending;
+  const isReverting = unapproveMutation.isPending;
+  const canEditMedia = (status) => status === 'draft' || status === 'approved' || status === 'scheduled';
 
   const saveAffiliate = (postId, affiliateLinkId) => {
     updateMutation.mutate({
@@ -474,14 +530,14 @@ export default function ContentGenerator() {
                   </>
                 )}
 
-                {(post.status === 'draft' || post.status === 'approved') && (
+                {canEditMedia(post.status) && (
                   <div className="panel-muted mt-4 space-y-4 p-3">
                     <div>
                       <label className="text-muted mb-2 flex items-center gap-1 text-xs font-medium">
                         <ImagePlus size={12} /> Hook image (optional)
                       </label>
                       <p className="text-muted mb-3 text-xs">
-                        Attached to Reply 1 when published. JPEG or PNG, max 8 MB. Meta needs a public HTTPS URL (your ngrok tunnel).
+                        Attached to Reply 1 when published. JPEG or PNG, max 8 MB.
                       </p>
                       {post.hook_image_url ? (
                         <div className="flex flex-wrap items-start gap-3">
@@ -554,22 +610,46 @@ export default function ContentGenerator() {
                           {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                           Save edits
                         </button>
+                        <button type="button" onClick={cancelEdit} className="btn-secondary !py-2 !text-xs">
+                          Cancel
+                        </button>
                         <button
                           type="button"
-                          onClick={() => { setEditingId(null); setEditContent(''); }}
-                          className="btn-secondary !py-2 !text-xs"
+                          onClick={() => handleDelete(post)}
+                          disabled={isDeleting}
+                          className="btn-danger !py-2 !text-xs"
                         >
-                          Cancel
+                          {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          Delete
                         </button>
                       </>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => startEdit(post)}
-                        className="btn-secondary !py-2 !text-xs"
-                      >
-                        <Pencil size={14} /> Edit
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(post)}
+                          className="btn-secondary !py-2 !text-xs"
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
+                        <button
+                      type="button"
+                      onClick={() => regenerateMutation.mutate(post.id)}
+                      disabled={regenerateMutation.isPending}
+                      className="btn-secondary !py-2 !text-xs"
+                    >
+                      {regenerateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      Regenerate
+                    </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(post)}
+                          disabled={isDeleting}
+                          className="btn-danger !py-2 !text-xs"
+                        >
+                          <X size={14} /> Delete
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
@@ -579,32 +659,80 @@ export default function ContentGenerator() {
                     >
                       <Check size={14} /> Approve
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => rejectMutation.mutate(post.id)}
-                      disabled={rejectMutation.isPending}
-                      className="btn-danger !py-2 !text-xs"
-                    >
-                      <X size={14} /> Reject
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => regenerateMutation.mutate(post.id)}
-                      disabled={regenerateMutation.isPending}
-                      className="btn-secondary !py-2 !text-xs"
-                    >
-                      {regenerateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                      Regenerate
-                    </button>
+                 
                   </div>
                 )}
 
                 {post.status === 'scheduled' && (
-                  <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
-                    <Calendar size={16} />
-                    Queued for automatic publish.
-                    <Link to="/scheduler" className="font-semibold underline">View queue</Link>
-                  </p>
+                  <>
+                    <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
+                      <Calendar size={16} />
+                      Queued for automatic publish.
+                      <Link to="/scheduler" className="font-semibold underline">View queue</Link>
+                    </p>
+                    <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                      {editingId === post.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => saveEdit(post.id)}
+                            disabled={updateMutation.isPending}
+                            className="btn-primary !py-2 !text-xs"
+                          >
+                            {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                            Save edits
+                          </button>
+                          <button type="button" onClick={cancelEdit} className="btn-secondary !py-2 !text-xs">
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUnapprove(post)}
+                            disabled={isReverting}
+                            className="btn-secondary !py-2 !text-xs"
+                          >
+                            {isReverting ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} />}
+                            Revert to draft
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(post)}
+                            disabled={isDeleting}
+                            className="btn-danger !py-2 !text-xs"
+                          >
+                            {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            Delete
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(post)}
+                            className="btn-secondary !py-2 !text-xs"
+                          >
+                            <Pencil size={14} /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUnapprove(post)}
+                            disabled={isReverting}
+                            className="btn-secondary !py-2 !text-xs"
+                          >
+                            <Undo2 size={14} /> Revert to draft
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(post)}
+                            disabled={isDeleting}
+                            className="btn-danger !py-2 !text-xs"
+                          >
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 {post.status === 'approved' && (
@@ -649,22 +777,11 @@ export default function ContentGenerator() {
                       settings={schedulerSettings}
                     />
 
-                    <p className="text-muted mt-3 text-xs">
-                      Cron runs <code className="code-inline">publish_posts.php</code> every minute — see Scheduler for setup.
-                    </p>
+                   
                   </div>
 
                   <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
-                    {editingId !== post.id && (
-                      <button
-                        type="button"
-                        onClick={() => startEdit(post)}
-                        className="btn-secondary !py-2 !text-xs"
-                      >
-                        <Pencil size={14} /> Edit
-                      </button>
-                    )}
-                    {editingId === post.id && (
+                    {editingId === post.id ? (
                       <>
                         <button
                           type="button"
@@ -672,14 +789,55 @@ export default function ContentGenerator() {
                           disabled={updateMutation.isPending}
                           className="btn-primary !py-2 !text-xs"
                         >
-                          <Save size={14} /> Save edits
+                          {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                          Save edits
+                        </button>
+                        <button type="button" onClick={cancelEdit} className="btn-secondary !py-2 !text-xs">
+                          Cancel
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setEditingId(null); setEditContent(''); }}
+                          onClick={() => handleUnapprove(post)}
+                          disabled={isReverting}
                           className="btn-secondary !py-2 !text-xs"
                         >
-                          Cancel
+                          {isReverting ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} />}
+                          Revert to draft
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(post)}
+                          disabled={isDeleting}
+                          className="btn-danger !py-2 !text-xs"
+                        >
+                          {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(post)}
+                          className="btn-secondary !py-2 !text-xs"
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUnapprove(post)}
+                          disabled={isReverting}
+                          className="btn-secondary !py-2 !text-xs"
+                        >
+                          <Undo2 size={14} /> Revert to draft
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(post)}
+                          disabled={isDeleting}
+                          className="btn-danger !py-2 !text-xs"
+                        >
+                          <Trash2 size={14} /> Delete
                         </button>
                       </>
                     )}
@@ -707,7 +865,7 @@ export default function ContentGenerator() {
                       }
                     >
                       {publishMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                      Publish to Threads
+                      Publish Now
                     </button>
                     {!hasThreadsAccount && (
                       <span className="text-muted text-xs">Connect Threads in Settings</span>
@@ -720,10 +878,61 @@ export default function ContentGenerator() {
                 )}
 
                 {post.status === 'posted' && post.metadata?.threads_publish && (
-                  <p className="mt-4 flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    Live on Threads · {post.metadata.threads_publish.published_count} posts in chain
-                  </p>
+                  <>
+                    <p className="mt-4 flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      Live on Threads · {post.metadata.threads_publish.published_count} posts in chain
+                    </p>
+                    <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                      {editingId === post.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => saveEdit(post.id)}
+                            disabled={updateMutation.isPending}
+                            className="btn-primary !py-2 !text-xs"
+                          >
+                            {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                            Save edits
+                          </button>
+                          <button type="button" onClick={cancelEdit} className="btn-secondary !py-2 !text-xs">
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(post)}
+                            disabled={isDeleting}
+                            className="btn-danger !py-2 !text-xs"
+                          >
+                            {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            Delete
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(post)}
+                            className="btn-secondary !py-2 !text-xs"
+                          >
+                            <Pencil size={14} /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(post)}
+                            disabled={isDeleting}
+                            className="btn-danger !py-2 !text-xs"
+                            title="Choose whether to also delete from Threads"
+                          >
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        </>
+                      )}
+                      <span className="text-muted self-center text-xs">
+                        Delete opens a dialog to choose Threads + AutoThreads or AutoThreads only
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
             </article>

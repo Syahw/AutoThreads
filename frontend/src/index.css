@@ -194,3 +194,62 @@
     @apply rounded bg-slate-100 px-1 text-xs dark:bg-slate-800 dark:text-slate-300;
   }
 }
+
+/* SweetAlert2 — match app card + dark mode */
+.swal-app-popup {
+  border: 1px solid rgb(226 232 240 / 0.8) !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 4px 24px -4px rgb(15 23 42 / 0.12) !important;
+}
+
+html.dark .swal-app-popup {
+  border-color: rgb(51 65 85 / 0.8) !important;
+  box-shadow: 0 0 0 1px rgb(51 65 85 / 0.3), 0 8px 32px -8px rgb(0 0 0 / 0.5) !important;
+}
+
+.swal-app-title {
+  color: inherit !important;
+}
+
+.swal-app-html {
+  color: inherit !important;
+}
+
+.swal-app-muted {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+html.dark .swal-app-muted {
+  color: #94a3b8;
+}
+
+html.dark .swal2-container.swal2-backdrop-show {
+  background: rgb(2 6 23 / 0.72) !important;
+}
+
+html.dark .swal2-icon.swal2-warning {
+  border-color: #f59e0b !important;
+  color: #fbbf24 !important;
+}
+
+html.dark .swal2-icon.swal2-warning .swal2-icon-content {
+  color: #fbbf24 !important;
+}
+
+html.dark .swal2-icon.swal2-question {
+  border-color: #6366f1 !important;
+  color: #818cf8 !important;
+}
+
+html.dark .swal2-icon.swal2-question .swal2-icon-content {
+  color: #818cf8 !important;
+}
+
+.swal-app-btn {
+  border-radius: 0.75rem !important;
+  font-weight: 500 !important;
+  padding: 0.5rem 1rem !important;
+}

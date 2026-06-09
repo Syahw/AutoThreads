@@ -6,6 +6,7 @@ import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
 import AdminTabs from '../../components/admin/AdminTabs';
+import { formatDateTime } from '../../utils/date';
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
@@ -82,7 +83,7 @@ function QueueTab() {
                       <p className="text-subheading font-medium">{p.user_name}</p>
                       <p className="text-muted text-xs">{p.user_email}</p>
                     </td>
-                    <td className="px-4 py-3 text-muted whitespace-nowrap">{p.scheduled_at}</td>
+                    <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDateTime(p.scheduled_at)}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={p.display_status} label={p.display_status} />
                       {p.retry_count > 0 && <p className="text-muted mt-1 text-xs">Retries: {p.retry_count}</p>}
@@ -144,7 +145,7 @@ function WorkerTab() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <StatusBadge status={data?.health} label={data?.health_label} />
-          <span className="text-muted text-sm">Last run: {data?.last_run ?? 'Never'}</span>
+          <span className="text-muted text-sm">Last run: {data?.last_run ? formatDateTime(data.last_run) : 'Never'}</span>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => refetch()} className="btn-secondary inline-flex items-center gap-2 text-xs">
@@ -157,7 +158,7 @@ function WorkerTab() {
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Last worker run" value={data?.last_run?.slice(0, 16) ?? '—'} icon={Clock} accent="brand" />
+        <StatCard label="Last worker run" value={data?.last_run ? formatDateTime(data.last_run) : '—'} icon={Clock} accent="brand" />
         <StatCard label="Published today" value={data?.published_today ?? 0} icon={Activity} accent="emerald" />
         <StatCard label="Failed today" value={data?.failed_today ?? 0} icon={AlertTriangle} accent="violet" />
         <StatCard label="Avg processing" value={`${avgSec}s`} icon={Timer} accent="amber" />

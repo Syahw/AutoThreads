@@ -3,7 +3,9 @@
 namespace AutoThreads\Controllers;
 
 use AutoThreads\Models\GeneratedPost;
+use AutoThreads\Models\ScheduledPost;
 use AutoThreads\Models\ThreadsAccount;
+use AutoThreads\Services\Threads\ThreadsClient;
 use AutoThreads\Services\AI\ContentGenerator;
 use AutoThreads\Services\AI\Humanizer;
 use AutoThreads\Services\Media\HookImageStorage;
@@ -286,10 +288,10 @@ class ContentController
             ->where('user_id', $userId)
             ->firstOrFail();
 
-        if (!in_array($post->status, ['draft', 'approved'], true)) {
+        if (!in_array($post->status, ['draft', 'approved', 'scheduled'], true)) {
             return $this->json($response, [
                 'error' => true,
-                'message' => 'Hook image can only be added to draft or approved posts',
+                'message' => 'Hook image can only be added to draft, approved, or scheduled posts',
             ], 422);
         }
 
@@ -439,24 +441,149 @@ class ContentController
         return $this->json($response, ['message' => 'Post rejected']);
     }
 
-    public function destroy(Request $request, Response $response, array $args): Response
+    /**
+     * Revert an approved or scheduled post back to draft (cancels queued schedule).
+     */
+    public function unapprove(Request $request, Response $response, array $args): Response
     {
-        $userId = $request->getAttribute('user_id');
+        $userId = (int) $request->getAttribute('user_id');
         $post = GeneratedPost::where('id', $args['id'])
             ->where('user_id', $userId)
             ->firstOrFail();
+
+        if (!in_array($post->status, ['approved', 'scheduled'], true)) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Only approved or scheduled posts can be reverted to draft',
+            ], 422);
+        }
+
+        $this->cancelQueuedScheduleForPost($post);
+        $post->status = 'draft';
+        $post->save();
+
+        return $this->json($response, [
+            'message' => 'Post reverted to draft',
+            'data' => $this->serializePost($post->fresh()),
+        ]);
+    }
+
+    public function destroy(Request $request, Response $response, array $args): Response
+    {
+        $userId = (int) $request->getAttribute('user_id');
+        $body = $request->getParsedBody() ?? [];
+        $query = $request->getQueryParams();
+        $deleteFromThreads = filter_var(
+            $body['delete_from_threads'] ?? $query['delete_from_threads'] ?? false,
+            FILTER_VALIDATE_BOOLEAN
+        );
+
+        $post = GeneratedPost::where('id', $args['id'])
+            ->where('user_id', $userId)
+            ->firstOrFail();
+
+        $threadsResult = null;
+
+        if ($deleteFromThreads) {
+            if ($post->status !== 'posted') {
+                return $this->json($response, [
+                    'error' => true,
+                    'message' => 'Only published posts can be deleted from Threads',
+                ], 422);
+            }
+
+            try {
+                $threadsResult = $this->deletePostFromThreads($post, $userId);
+            } catch (\Throwable $e) {
+                return $this->json($response, [
+                    'error' => true,
+                    'message' => 'Threads deletion failed: ' . $e->getMessage(),
+                ], 500);
+            }
+
+            if (!empty($threadsResult['errors'])) {
+                return $this->json($response, [
+                    'error' => true,
+                    'message' => 'Some Threads posts could not be deleted',
+                    'threads' => $threadsResult,
+                ], 502);
+            }
+        }
+
+        if (in_array($post->status, ['approved', 'scheduled'], true)) {
+            $this->cancelQueuedScheduleForPost($post);
+        }
 
         $filename = $post->metadata['hook_image']['filename'] ?? null;
         $this->hookImages->removeStoredFile(is_string($filename) ? $filename : null);
         $post->delete();
 
-        return $this->json($response, ['message' => 'Post deleted']);
+        return $this->json($response, [
+            'message' => $deleteFromThreads
+                ? 'Post deleted from AutoThreads and Threads'
+                : 'Post deleted',
+            'threads' => $threadsResult,
+        ]);
+    }
+
+    private function cancelQueuedScheduleForPost(GeneratedPost $post): void
+    {
+        ScheduledPost::where('generated_post_id', $post->id)
+            ->whereIn('status', ['queued', 'processing'])
+            ->get()
+            ->each(function (ScheduledPost $scheduled) {
+                $scheduled->status = 'cancelled';
+                $scheduled->save();
+            });
+    }
+
+    /** @return array{deleted: list<string>, errors: list<array{id: string, error: string}>} */
+    private function deletePostFromThreads(GeneratedPost $post, int $userId): array
+    {
+        $metadata = $post->metadata ?? [];
+        $publish = $metadata['threads_publish'] ?? null;
+        $postIds = $publish['post_ids'] ?? [];
+
+        if (!is_array($postIds) || $postIds === []) {
+            throw new \RuntimeException('No Threads post IDs found for this content');
+        }
+
+        $accountQuery = ThreadsAccount::where('user_id', $userId)->where('is_active', true);
+
+        if (!empty($publish['account_id'])) {
+            $accountQuery->where('id', (int) $publish['account_id']);
+        }
+
+        $account = $accountQuery->orderByDesc('created_at')->first();
+
+        if (!$account) {
+            throw new \RuntimeException('No connected Threads account found');
+        }
+
+        $client = new ThreadsClient();
+
+        if (!$client->tokenHasScope($account->access_token, 'threads_delete')) {
+            throw new \RuntimeException(
+                'Your Threads token is missing threads_delete. Disconnect and connect again in Settings.'
+            );
+        }
+
+        return $client->deleteThreadPosts($account, $postIds);
     }
 
     private function serializePost(GeneratedPost $post): array
     {
         $data = $post->toArray();
         $data['hook_image_url'] = $this->hookImages->resolvePublicUrl($post);
+
+        $activeSchedule = ScheduledPost::where('generated_post_id', $post->id)
+            ->whereIn('status', ['queued', 'processing'])
+            ->orderByDesc('id')
+            ->first();
+
+        if ($activeSchedule) {
+            $data['scheduled_post_id'] = $activeSchedule->id;
+        }
 
         return $data;
     }

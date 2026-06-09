@@ -92,6 +92,7 @@ $app->group('/api/v1', function (RouteCollectorProxy $group) {
         $protected->post('/content/{id}/hook-image', [ContentController::class, 'uploadHookImage']);
         $protected->delete('/content/{id}/hook-image', [ContentController::class, 'deleteHookImage']);
         $protected->put('/content/{id}/approve', [ContentController::class, 'approve']);
+        $protected->put('/content/{id}/unapprove', [ContentController::class, 'unapprove']);
         $protected->post('/content/{id}/publish', [ContentController::class, 'publish']);
         $protected->put('/content/{id}/reject', [ContentController::class, 'reject']);
         $protected->delete('/content/{id}', [ContentController::class, 'destroy']);

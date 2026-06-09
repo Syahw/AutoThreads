@@ -12,6 +12,7 @@ import StatCard from '../components/ui/StatCard';
 import EmptyState from '../components/ui/EmptyState';
 import { useThemeStore } from '../stores/themeStore';
 import { resolveTheme } from '../lib/theme';
+import { formatDate } from '../utils/date';
 
 function useChartTheme() {
   const mode = useThemeStore((s) => s.mode);
@@ -46,11 +47,6 @@ function ChartTooltip({ active, payload, label, theme }) {
       ))}
     </div>
   );
-}
-
-function formatShortDate(dateStr) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 export default function Analytics() {
@@ -102,7 +98,7 @@ export default function Analytics() {
   ];
 
   const trendData = trend.map((row) => ({
-    date: formatShortDate(row.date),
+    date: formatDate(row.date),
     impressions: Number(row.impressions),
     engagement: Number(row.engagement),
   }));

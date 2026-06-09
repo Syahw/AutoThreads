@@ -7,6 +7,7 @@ import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
 import AdminTabs from '../../components/admin/AdminTabs';
+import { formatDate } from '../../utils/date';
 
 const PLANS = ['free', 'starter', 'pro', 'enterprise'];
 const TABS = [
@@ -107,7 +108,7 @@ function UsersTab() {
                       </td>
                       <td className="px-4 py-3 capitalize">{u.plan}</td>
                       <td className="px-4 py-3"><StatusBadge status={u.status} /></td>
-                      <td className="px-4 py-3 text-muted">{u.joined}</td>
+                      <td className="px-4 py-3 text-muted">{formatDate(u.joined)}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           <button type="button" title="View" onClick={() => setSelected(u.id)} className="btn-icon"><UserCog size={14} /></button>
@@ -247,7 +248,7 @@ function SubscriptionsTab() {
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
                     <td className="px-4 py-3 text-muted text-xs">
-                      {row.subscription_expires_at ? new Date(row.subscription_expires_at).toLocaleDateString() : '—'}
+                      {formatDate(row.subscription_expires_at)}
                     </td>
                     <td className="px-4 py-3">{row.bonus_credits ?? 0}</td>
                     <td className="px-4 py-3">
