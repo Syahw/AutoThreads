@@ -72,7 +72,7 @@ class PromptBuilder
 
         $replyCount = $this->getRandomReplyCount();
 
-        $systemPrompt = $this->buildSystemPrompt($tone, $style, $targetAudience, $replyCount);
+        $systemPrompt = $this->buildSystemPrompt($tone, $style, $targetAudience, $replyCount, $config['diversity_hint'] ?? '');
         $userPrompt = $this->buildUserPrompt($category, $niche, $affiliate, $ctaStyle, $replyCount);
 
         return [
@@ -105,7 +105,7 @@ class PromptBuilder
         return random_int(5, 7);
     }
 
-    private function buildSystemPrompt(string $tone, string $style, string $audience, int $replyCount): string
+    private function buildSystemPrompt(string $tone, string $style, string $audience, int $replyCount, string $diversityHint = ''): string
     {
         // Add randomness to thread flow
         $flowVariations = [
@@ -126,13 +126,12 @@ class PromptBuilder
         Kau tulis THREAD panjang (bukan single post). Thread mesti rasa macam orang betul-betul cerita kat kawan, bukan script marketing.
 
         PANJANG THREAD (GENERATION INI):
-        - Tulis TEPAT {$replyCount} replies
+        - Tulis {$replyCount} replies
         - Setiap reply WAJIB substantif, bukan one-liner kosong
-        - Hook: 20-45 patah perkataan
-        - Middle replies: 30-80 patah perkataan setiap satu (cerita, detail, konteks, perasaan)
-        - Last reply: 30-60 patah perkataan
+        - Hook biasanya sekitar 20-45 patah perkataan, tapi ikut rasa natural
+        - Middle replies biasanya 30-80 patah perkataan setiap satu (cerita, detail, konteks, perasaan)
+        - Last reply biasanya 30-60 patah perkataan
         - Total thread target: 400-800+ patah perkataan keseluruhan
-        - Jangan tambah atau kurangkan bilangan reply
 
         SUARA & GAYA:
         - Tone: {$tone}, tapi rendahkan hype, naikkan authenticity
@@ -200,6 +199,7 @@ class PromptBuilder
         - Vary sentence length aggressively
         - Some replies boleh start lowercase for casual vibe
 
+        {$diversityHint}
         OUTPUT FORMAT:
         Reply 1:
         Reply 2:
@@ -244,10 +244,10 @@ class PromptBuilder
         $prompt .= "\nFORMAT OUTPUT (WAJIB IKUT EXACTLY):\n";
         $prompt .= $this->buildReplyFormatSection($replyCount);
         $prompt .= "Tulis sepenuhnya dalam Bahasa Melayu (santai, sincere, ejaan betul).\n";
-        $prompt .= "PANJANG: setiap reply middle reply 30-80 patah perkataan. Total thread 400-800+ patah perkataan.\n";
+        $prompt .= "PANJANG: middle replies biasanya 30-80 patah perkataan. Total thread sasaran 400-800+ patah perkataan.\n";
         $prompt .= "ENERGI: rendah-key, jangan paksa excitement atau tanda seru.\n";
         $prompt .= "TANDA BACA: jangan guna em dash (—) dalam thread. Guna koma atau titik je.\n";
-        $prompt .= "JANGAN tambah apa-apa text lain selain format di atas. EXACTLY {$replyCount} replies.\n";
+        $prompt .= "JANGAN tambah apa-apa text lain selain format di atas. Tulis {$replyCount} replies.\n";
 
         return $prompt;
     }

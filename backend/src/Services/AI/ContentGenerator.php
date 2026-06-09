@@ -8,6 +8,10 @@ use AutoThreads\Models\Niche;
 use AutoThreads\Models\AiUsageLog;
 use AutoThreads\Services\AI\PromptBuilder;
 use AutoThreads\Services\AI\Humanizer;
+use AutoThreads\Services\AI\LightHumanizer;
+use AutoThreads\Services\AI\AIContentReviewer;
+use AutoThreads\Services\AI\ContentDiversityManager;
+use AutoThreads\Services\AI\ContentQualityChecker;
 use AutoThreads\Services\AI\QualityScorer;
 use AutoThreads\Services\Media\ProcessedImage;
 use GuzzleHttp\Client;
@@ -15,20 +19,27 @@ use Psr\Log\LoggerInterface;
 
 /**
  * ContentGenerator - Core AI content generation pipeline
- * 
- * Pipeline: Topic → Prompt Build → AI Generate → Humanize → Score → Store
- * 
+ *
+ * Pipeline:
+ *   DiversityManager → PromptBuilder → GPT-4o Mini (generate)
+ *   → AIContentReviewer (polish pass) → LightHumanizer
+ *   → ContentQualityChecker → QualityScorer → Store → DiversityManager.record()
+ *
  * Design decisions:
- * - Modular pipeline allows swapping any step independently
- * - Each step is testable in isolation
- * - Supports multiple AI providers via adapter pattern
- * - Anti-repetition built into prompt construction
+ * - Model does the humanization work; PHP only strips what should never appear
+ * - Review pass uses low temperature (0.25) to make targeted edits only
+ * - Quality flags are non-blocking — logged and stored in metadata
+ * - Diversity memory persists across requests via file-based JSON store
  */
 class ContentGenerator
 {
     private Client $httpClient;
     private PromptBuilder $promptBuilder;
     private Humanizer $humanizer;
+    private LightHumanizer $lightHumanizer;
+    private AIContentReviewer $reviewer;
+    private ContentDiversityManager $diversityManager;
+    private ContentQualityChecker $qualityChecker;
     private QualityScorer $scorer;
     private OpenAIResponsesClient $visionClient;
     private ImageAnalysisConfig $imageConfig;
@@ -43,10 +54,14 @@ class ContentGenerator
             'timeout' => 30,
             'verify' => guzzle_ssl_verify(),
         ]);
-        $this->promptBuilder = new PromptBuilder();
-        $this->humanizer = new Humanizer();
-        $this->scorer = new QualityScorer();
-        $this->visionClient = new OpenAIResponsesClient($this->imageConfig, $logger);
+        $this->promptBuilder    = new PromptBuilder();
+        $this->humanizer        = new Humanizer();
+        $this->lightHumanizer   = new LightHumanizer();
+        $this->reviewer         = new AIContentReviewer($logger);
+        $this->diversityManager = new ContentDiversityManager();
+        $this->qualityChecker   = new ContentQualityChecker();
+        $this->scorer           = new QualityScorer();
+        $this->visionClient     = new OpenAIResponsesClient($this->imageConfig, $logger);
     }
 
     public function getImageConfig(): ImageAnalysisConfig
@@ -55,36 +70,112 @@ class ContentGenerator
     }
 
     /**
-     * Generate content for a given configuration
+     * Generate content for a given configuration.
+     *
+     * Pipeline:
+     *   1. Diversity hint injection
+     *   2. GPT-4o Mini generation
+     *   3. GPT-4o Mini self-review / polish pass
+     *   4. LightHumanizer (buzzword strip, em-dash removal, exclamation cap)
+     *   5. ContentQualityChecker (flag logging)
+     *   6. QualityScorer
+     *   7. Persist to DB
+     *   8. Record hook for future diversity checks
      */
     public function generate(array $config): GeneratedPost
     {
-        $userId = $config['user_id'];
-        $nicheId = $config['niche_id'] ?? null;
-        $topicId = $config['topic_id'] ?? null;
+        $userId          = $config['user_id'];
+        $nicheId         = $config['niche_id'] ?? null;
+        $topicId         = $config['topic_id'] ?? null;
         $affiliateLinkId = $config['affiliate_link_id'] ?? null;
-        $category = $config['category'] ?? 'general';
-        $tone = $config['tone'] ?? null;
-        $variations = $config['variations'] ?? 1;
+        $category        = $config['category'] ?? 'general';
+        $tone            = $config['tone'] ?? null;
+        $variations      = $config['variations'] ?? 1;
 
-        // Load related data
-        $niche = $nicheId ? Niche::find($nicheId) : null;
+        $niche         = $nicheId ? Niche::find($nicheId) : null;
         $affiliateLink = $affiliateLinkId ? AffiliateLink::find($affiliateLinkId) : null;
 
-        // Build the prompt
+        // 1. Build prompt with diversity hint
         $prompt = $this->promptBuilder->build([
-            'niche' => $niche,
-            'category' => $category,
-            'tone' => $tone,
-            'affiliate' => $affiliateLink,
+            'niche'           => $niche,
+            'category'        => $category,
+            'tone'            => $tone,
+            'affiliate'       => $affiliateLink,
             'target_audience' => $niche?->target_audience,
-            'cta_style' => $affiliateLink?->cta_style ?? 'soft',
+            'cta_style'       => $affiliateLink?->cta_style ?? 'soft',
+            'diversity_hint'  => $this->diversityManager->buildDiversityHint(),
         ]);
 
-        // Call OpenAI API
-        $aiResponse = $this->callOpenAI($prompt['system'], $prompt['user']);
+        // 2. Generate
+        $aiResponse  = $this->callOpenAI($prompt['system'], $prompt['user']);
+        $totalTokens = $aiResponse['tokens_used'];
 
-        $post = $this->storeGeneratedPost($config, $prompt, $aiResponse, $niche, $affiliateLinkId, $topicId, $variations);
+        // 3. Self-review / polish pass
+        $reviewApplied = false;
+        $contentToProcess = $aiResponse['content'];
+        try {
+            $reviewResult     = $this->reviewer->review($aiResponse['content']);
+            $contentToProcess = $reviewResult['content'];
+            $totalTokens     += $reviewResult['tokens_used'];
+            $reviewApplied    = true;
+        } catch (\Throwable $e) {
+            $this->logger?->warning('Review pass failed, using raw generation', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // 4. Light humanize
+        $humanized = $this->lightHumanizer->process($contentToProcess);
+
+        // 5. Quality check (non-blocking — flags stored in metadata)
+        $qualityCheck = $this->qualityChecker->check($humanized);
+        if (!$qualityCheck['passed']) {
+            $this->logger?->info('Quality flags on generated content', [
+                'user_id'  => $userId,
+                'category' => $category,
+                'flags'    => $qualityCheck['flags'],
+            ]);
+        }
+
+        // 6. Score
+        $scores = $this->scorer->score($humanized);
+
+        // 7. Persist
+        $post = GeneratedPost::create([
+            'user_id'          => $userId,
+            'niche_id'         => $niche?->id,
+            'topic_id'         => $topicId,
+            'affiliate_link_id' => $affiliateLinkId,
+            'content'          => $humanized['content'],
+            'hook'             => $humanized['hook'],
+            'cta'              => $humanized['cta'],
+            'hashtags'         => $humanized['hashtags'] ?? [],
+            'category'         => $category,
+            'tone'             => $tone ?? $prompt['tone_used'],
+            'writing_style'    => $prompt['style_used'],
+            'quality_score'    => $scores['overall'],
+            'humanization_score' => $scores['humanization'],
+            'status'           => 'draft',
+            'ai_model'         => $aiResponse['model'],
+            'tokens_used'      => $totalTokens,
+            'generation_cost'  => $this->calculateCost($totalTokens),
+            'variations_count' => $variations,
+            'metadata'         => [
+                'prompt_hash'       => md5($prompt['user']),
+                'generation_time_ms' => $aiResponse['time_ms'],
+                'replies'           => $humanized['replies'] ?? [],
+                'thread_format'     => !empty($humanized['replies']),
+                'review_applied'    => $reviewApplied,
+                'quality_flags'     => $qualityCheck['flags'],
+            ],
+        ]);
+
+        // 8. Record hook for diversity memory
+        $this->diversityManager->record(
+            $humanized['hook'],
+            $niche?->name ?? $category
+        );
+
         $this->logAiUsage((int) $userId, $aiResponse, 'generate');
 
         return $post;
@@ -130,12 +221,27 @@ class ContentGenerator
             $niche?->name
         );
 
-        $detail = $highDetail ? 'high' : null;
+        $detail    = $highDetail ? 'high' : null;
         $aiResponse = $this->visionClient->generateWithImages($systemPrompt, $visionUserPrompt, $images, $detail);
 
         $threadContent = $this->stripExtractedTextBlock($aiResponse['content']);
-        $humanized = $this->humanizer->process($threadContent);
-        $scores = $this->scorer->score($humanized);
+
+        // Self-review pass
+        $reviewApplied = false;
+        $contentToProcess = $threadContent;
+        try {
+            $reviewResult     = $this->reviewer->review($threadContent);
+            $contentToProcess = $reviewResult['content'];
+            $reviewApplied    = true;
+        } catch (\Throwable $e) {
+            $this->logger?->warning('Vision review pass failed, using raw content', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $humanized    = $this->lightHumanizer->process($contentToProcess);
+        $qualityCheck = $this->qualityChecker->check($humanized);
+        $scores       = $this->scorer->score($humanized);
 
         $imageMetadata = array_map(fn (ProcessedImage $img) => $img->toMetadata(), $images);
         $processingMeta = [
@@ -168,21 +274,32 @@ class ContentGenerator
             'generation_cost' => $this->calculateCost($aiResponse['usage']['total_tokens']),
             'variations_count' => $variations,
             'metadata' => [
-                'prompt_hash' => md5($visionUserPrompt),
+                'prompt_hash'        => md5($visionUserPrompt),
                 'generation_time_ms' => $aiResponse['time_ms'],
-                'replies' => $humanized['replies'] ?? [],
-                'thread_format' => !empty($humanized['replies']),
-                'image_generation' => $processingMeta,
-                'extracted_text' => $aiResponse['extracted_text'],
+                'replies'            => $humanized['replies'] ?? [],
+                'thread_format'      => !empty($humanized['replies']),
+                'review_applied'     => $reviewApplied,
+                'quality_flags'      => $qualityCheck['flags'],
+                'image_generation'   => $processingMeta,
+                'extracted_text'     => $aiResponse['extracted_text'],
             ],
         ]);
 
+        $this->diversityManager->record($humanized['hook'], $niche?->name ?? $category);
+
+        if (!$qualityCheck['passed']) {
+            $this->logger?->info('Quality flags on vision-generated content', [
+                'user_id' => $userId,
+                'flags'   => $qualityCheck['flags'],
+            ]);
+        }
+
         $this->logger?->info('Vision content generated', [
-            'user_id' => $userId,
-            'post_id' => $post->id,
-            'images' => count($images),
+            'user_id'                => $userId,
+            'post_id'                => $post->id,
+            'images'                 => count($images),
             'estimated_image_tokens' => $aiResponse['estimated_image_tokens'],
-            'total_tokens' => $aiResponse['usage']['total_tokens'],
+            'total_tokens'           => $aiResponse['usage']['total_tokens'],
         ]);
 
         $this->logAiUsage((int) $userId, [
@@ -268,47 +385,6 @@ class ContentGenerator
             'time_ms' => $timeMs,
             'model' => $data['model'] ?? ($_ENV['OPENAI_MODEL'] ?? 'gpt-4o-mini'),
         ];
-    }
-
-    /** @param array<string, mixed> $prompt */
-    private function storeGeneratedPost(
-        array $config,
-        array $prompt,
-        array $aiResponse,
-        ?Niche $niche,
-        ?int $affiliateLinkId,
-        ?int $topicId,
-        int $variations
-    ): GeneratedPost {
-        $humanized = $this->humanizer->process($aiResponse['content']);
-        $scores = $this->scorer->score($humanized);
-
-        return GeneratedPost::create([
-            'user_id' => $config['user_id'],
-            'niche_id' => $niche?->id,
-            'topic_id' => $topicId,
-            'affiliate_link_id' => $affiliateLinkId,
-            'content' => $humanized['content'],
-            'hook' => $humanized['hook'],
-            'cta' => $humanized['cta'],
-            'hashtags' => $humanized['hashtags'] ?? [],
-            'category' => $config['category'] ?? 'general',
-            'tone' => $config['tone'] ?? $prompt['tone_used'],
-            'writing_style' => $prompt['style_used'],
-            'quality_score' => $scores['overall'],
-            'humanization_score' => $scores['humanization'],
-            'status' => 'draft',
-            'ai_model' => $aiResponse['model'] ?? ($_ENV['OPENAI_MODEL'] ?? 'gpt-4o-mini'),
-            'tokens_used' => $aiResponse['tokens_used'],
-            'generation_cost' => $this->calculateCost($aiResponse['tokens_used']),
-            'variations_count' => $variations,
-            'metadata' => [
-                'prompt_hash' => md5($prompt['user']),
-                'generation_time_ms' => $aiResponse['time_ms'],
-                'replies' => $humanized['replies'] ?? [],
-                'thread_format' => !empty($humanized['replies']),
-            ],
-        ]);
     }
 
     private function stripExtractedTextBlock(string $content): string
