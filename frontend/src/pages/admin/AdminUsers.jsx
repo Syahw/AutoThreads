@@ -9,7 +9,7 @@ import StatusBadge from '../../components/admin/StatusBadge';
 import AdminTabs from '../../components/admin/AdminTabs';
 import { formatDate } from '../../utils/date';
 
-const PLANS = ['free', 'starter', 'pro', 'enterprise'];
+const PLANS = ['free', 'starter', 'pro', 'premium'];
 const TABS = [
   { id: 'users', label: 'Users' },
   { id: 'subscriptions', label: 'Subscriptions' },
