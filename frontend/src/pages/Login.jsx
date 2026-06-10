@@ -59,7 +59,7 @@ export default function Login() {
             Automate Threads content that sounds human.
           </h2>
           <p className="mt-4 max-w-md text-slate-400">
-            Generate Bahasa Malaysia threads, approve with one click, and publish chained replies to Meta Threads.
+            Generate Bahasa Melayu threads, approve with one click, and publish chained replies to Meta Threads.
           </p>
           <ul className="mt-8 space-y-3 text-sm text-slate-300">
             <li className="flex items-center gap-2">

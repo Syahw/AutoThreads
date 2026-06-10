@@ -30,7 +30,7 @@ export default function Dashboard() {
   ];
 
   const quickLinks = [
-    { to: '/content', label: 'Generate new content', desc: 'AI threads in Bahasa Malaysia', color: 'brand' },
+    { to: '/content', label: 'Generate new content', desc: 'AI threads in Bahasa Melayu', color: 'brand' },
     { to: '/scheduler', label: 'View scheduled posts', desc: 'Queue and timing', color: 'amber' },
     { to: '/analytics', label: 'Check analytics', desc: 'Performance insights', color: 'emerald' },
   ];
