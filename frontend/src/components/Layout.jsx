@@ -8,45 +8,39 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import ThemeToggle from './ThemeToggle';
+import LanguageToggle from './LanguageToggle';
+import { useTranslation } from '../i18n';
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/content', icon: Sparkles, label: 'Content' },
-  { to: '/scheduler', icon: Calendar, label: 'Scheduler' },
-  { to: '/niches', icon: Tag, label: 'Niches' },
-  { to: '/affiliates', icon: Link2, label: 'Affiliates' },
-  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+const navRoutes = [
+  { to: '/', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+  { to: '/content', icon: Sparkles, labelKey: 'nav.content' },
+  { to: '/scheduler', icon: Calendar, labelKey: 'nav.scheduler' },
+  { to: '/niches', icon: Tag, labelKey: 'nav.niches' },
+  { to: '/affiliates', icon: Link2, labelKey: 'nav.affiliates' },
+  { to: '/analytics', icon: BarChart3, labelKey: 'nav.analytics' },
+  { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 
-const adminNavItems = [
-  { to: '/admin/dashboard', icon: Shield, label: 'Admin home' },
-  { to: '/admin/users', icon: Users, label: 'Users & subscriptions' },
-  { to: '/admin/publishing', icon: ListOrdered, label: 'Publishing monitor' },
-  { to: '/admin/logs', icon: ScrollText, label: 'System logs' },
-  { to: '/admin/settings', icon: SlidersHorizontal, label: 'Platform settings' },
+const adminNavRoutes = [
+  { to: '/admin/dashboard', icon: Shield, labelKey: 'nav.adminHome' },
+  { to: '/admin/users', icon: Users, labelKey: 'nav.adminUsers' },
+  { to: '/admin/publishing', icon: ListOrdered, labelKey: 'nav.adminPublishing' },
+  { to: '/admin/logs', icon: ScrollText, labelKey: 'nav.adminLogs' },
+  { to: '/admin/settings', icon: SlidersHorizontal, labelKey: 'nav.adminSettings' },
 ];
-
-const pageTitles = {
-  '/': 'Dashboard',
-  '/content': 'Content Generator',
-  '/scheduler': 'Scheduler',
-  '/niches': 'Niches',
-  '/affiliates': 'Affiliate Links',
-  '/analytics': 'Analytics',
-  '/settings': 'Settings',
-  '/admin/dashboard': 'Admin Home',
-  '/admin/users': 'Users & Subscriptions',
-  '/admin/publishing': 'Publishing Monitor',
-  '/admin/logs': 'System Logs',
-  '/admin/settings': 'Platform Settings',
-};
 
 export default function Layout() {
   const { user, logout, isImpersonating, stopImpersonating } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
-  const pageTitle = pageTitles[location.pathname] || 'AutoThreads';
+  const { t } = useTranslation();
+
+  const pageTitleKey = `layout.pageTitle.${location.pathname}`;
+  const pageTitleTranslated = t(pageTitleKey);
+  const pageTitle = pageTitleTranslated === pageTitleKey
+    ? t('layout.fallbackTitle')
+    : pageTitleTranslated;
+
   const isAdmin = user?.role === 'admin' && !isImpersonating;
 
   return (
@@ -72,24 +66,24 @@ export default function Layout() {
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight text-white">AutoThreads</h1>
-              <p className="text-xs text-slate-400">AI · Threads · Affiliate</p>
+              <p className="text-xs text-slate-400">{t('nav.tagline')}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
-            aria-label="Close sidebar"
+            aria-label={t('layout.closeSidebar')}
           >
             <X size={20} />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Main navigation">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label={t('layout.mainNav')}>
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-            Menu
+            {t('nav.menu')}
           </p>
-          {navItems.map(({ to, icon: Icon, label }) => (
+          {navRoutes.map(({ to, icon: Icon, labelKey }) => (
             <NavLink
               key={to}
               to={to}
@@ -117,7 +111,7 @@ export default function Layout() {
                   >
                     <Icon size={18} />
                   </span>
-                  {label}
+                  {t(labelKey)}
                 </>
               )}
             </NavLink>
@@ -125,9 +119,9 @@ export default function Layout() {
           {isAdmin && (
             <>
               <p className="mb-2 mt-4 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Admin
+                {t('nav.admin')}
               </p>
-              {adminNavItems.map(({ to, icon: Icon, label }) => (
+              {adminNavRoutes.map(({ to, icon: Icon, labelKey }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -154,7 +148,7 @@ export default function Layout() {
                       >
                         <Icon size={18} />
                       </span>
-                      {label}
+                      {t(labelKey)}
                     </>
                   )}
                 </NavLink>
@@ -171,7 +165,9 @@ export default function Layout() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white">{user?.name}</p>
-                <p className="truncate text-xs capitalize text-slate-400">{user?.plan ?? 'free'} plan</p>
+                <p className="truncate text-xs capitalize text-slate-400">
+                  {user?.plan ?? 'free'} {t('layout.planSuffix')}
+                </p>
               </div>
             </div>
             <button
@@ -180,7 +176,7 @@ export default function Layout() {
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-700/50 hover:text-red-300"
             >
               <LogOut size={14} />
-              Sign out
+              {t('layout.signOut')}
             </button>
           </div>
         </div>
@@ -192,20 +188,21 @@ export default function Layout() {
             type="button"
             onClick={() => setSidebarOpen(true)}
             className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 lg:hidden"
-            aria-label="Open sidebar"
+            aria-label={t('layout.openSidebar')}
           >
             <Menu size={20} />
           </button>
           <div className="flex-1 min-w-0">
             <p className="hidden text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500 sm:block">
-              Workspace
+              {t('layout.workspace')}
             </p>
             <h2 className="truncate text-lg font-bold text-slate-900 dark:text-slate-50 sm:text-xl">{pageTitle}</h2>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageToggle size="sm" />
             <ThemeToggle compact />
             <span className="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/10 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-500/20 sm:inline">
-              System online
+              {t('layout.systemOnline')}
             </span>
           </div>
         </header>
@@ -214,10 +211,10 @@ export default function Layout() {
           {isImpersonating && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100 sm:px-6 lg:px-8">
               <span>
-                Viewing as <strong>{user?.name}</strong> ({user?.email})
+                {t('layout.viewingAs')} <strong>{user?.name}</strong> ({user?.email})
               </span>
               <button type="button" onClick={stopImpersonating} className="btn-secondary !py-1.5 !text-xs">
-                Return to admin account
+                {t('layout.returnToAdmin')}
               </button>
             </div>
           )}

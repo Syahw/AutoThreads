@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import PageHeader from '../../components/ui/PageHeader';
+import { useTranslation } from '../../i18n';
 import StatusBadge from '../../components/admin/StatusBadge';
 
 const LEVELS = ['all', 'error', 'warning', 'info'];
 
 export default function AdminLogs() {
   const [level, setLevel] = useState('all');
+  const { t } = useTranslation();
 
   const { data: logs = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-logs', level],
@@ -18,11 +20,11 @@ export default function AdminLogs() {
   return (
     <div>
       <PageHeader
-        title="System logs"
-        description="Centralized worker and application logs for debugging."
+        title={t('admin.logsTitle')}
+        description={t('admin.logsDesc')}
         action={
           <button type="button" onClick={() => refetch()} className="btn-secondary">
-            Refresh
+            {t('common.refresh')}
           </button>
         }
       />

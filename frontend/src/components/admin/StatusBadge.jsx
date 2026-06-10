@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { useTranslation } from '../../i18n';
 
 const styles = {
   active: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/50 dark:text-emerald-300',
@@ -23,8 +24,15 @@ const styles = {
 };
 
 export default function StatusBadge({ status, label }) {
+  const { t } = useTranslation();
   const key = status ?? label ?? 'info';
-  const text = label ?? String(status ?? '').replace(/_/g, ' ');
+  const statusKey = String(key).toLowerCase();
+  const translated = t(`status.${statusKey}`, {}) !== `status.${statusKey}`
+    ? t(`status.${statusKey}`)
+    : t(`status.${key}`, {}) !== `status.${key}`
+      ? t(`status.${key}`)
+      : null;
+  const text = label ?? translated ?? String(status ?? '').replace(/_/g, ' ');
 
   return (
     <span

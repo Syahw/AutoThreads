@@ -86,6 +86,8 @@ $app->group('/api/v1', function (RouteCollectorProxy $group) {
         // Content Generation
         $protected->get('/content', [ContentController::class, 'index']);
         $protected->get('/content/vision-settings', [ContentController::class, 'visionSettings']);
+        $protected->post('/content/analyze-hook-image', [ContentController::class, 'analyzeHookImage']);
+        $protected->post('/content/analyze-thread-image', [ContentController::class, 'analyzeThreadImage']);
         $protected->post('/content/generate', [ContentController::class, 'generate']);
         $protected->post('/content/{id}/regenerate', [ContentController::class, 'regenerate']);
         $protected->put('/content/{id}', [ContentController::class, 'update']);

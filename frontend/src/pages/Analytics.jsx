@@ -13,6 +13,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { useThemeStore } from '../stores/themeStore';
 import { resolveTheme } from '../lib/theme';
 import { formatDate } from '../utils/date';
+import { useTranslation } from '../i18n';
 
 function useChartTheme() {
   const mode = useThemeStore((s) => s.mode);
@@ -50,6 +51,7 @@ function ChartTooltip({ active, payload, label, theme }) {
 }
 
 export default function Analytics() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const theme = useChartTheme();
 
@@ -91,10 +93,10 @@ export default function Analytics() {
   });
 
   const stats = [
-    { label: 'Total posts', value: overview?.total_posts ?? 0, icon: BarChart3, accent: 'brand' },
-    { label: 'Published', value: overview?.published_posts ?? 0, icon: Eye, accent: 'emerald' },
-    { label: 'Impressions', value: (overview?.total_impressions ?? 0).toLocaleString(), icon: TrendingUp, accent: 'amber' },
-    { label: 'Engagement', value: (overview?.total_engagement ?? 0).toLocaleString(), icon: Heart, accent: 'violet' },
+    { label: t('analytics.totalPosts'), value: overview?.total_posts ?? 0, icon: BarChart3, accent: 'brand' },
+    { label: t('analytics.published'), value: overview?.published_posts ?? 0, icon: Eye, accent: 'emerald' },
+    { label: t('analytics.impressions'), value: (overview?.total_impressions ?? 0).toLocaleString(), icon: TrendingUp, accent: 'amber' },
+    { label: t('analytics.engagement'), value: (overview?.total_engagement ?? 0).toLocaleString(), icon: Heart, accent: 'violet' },
   ];
 
   const trendData = trend.map((row) => ({
@@ -104,7 +106,7 @@ export default function Analytics() {
   }));
 
   const postsData = topPosts.map((post, i) => ({
-    name: post.hook ? post.hook.slice(0, 28) + (post.hook.length > 28 ? '…' : '') : `Post ${i + 1}`,
+    name: post.hook ? post.hook.slice(0, 28) + (post.hook.length > 28 ? '…' : '') : t('analytics.postName', { n: i + 1 }),
     engagement: Number(post.engagement),
     impressions: Number(post.impressions),
   }));
@@ -119,35 +121,38 @@ export default function Analytics() {
   const hasMetrics = (overview?.total_impressions ?? 0) > 0 || (overview?.total_engagement ?? 0) > 0;
   const showEmptyCharts = !chartsLoading && hasPublished && !hasMetrics;
 
+  const impressionsLabel = t('analytics.impressions');
+  const engagementLabel = t('analytics.engagement');
+
   return (
     <div>
       <PageHeader
-        title="Analytics"
-        description="Track performance after posts are published to Threads."
+        title={t('analytics.title')}
+        description={t('analytics.description')}
         action={
           <button
             type="button"
             onClick={() => collectMutation.mutate()}
             disabled={collectMutation.isPending || !hasPublished}
             className="btn btn-secondary"
-            title={!hasPublished ? 'Publish posts first to collect metrics' : undefined}
+            title={!hasPublished ? t('analytics.refreshTitle') : undefined}
           >
             {collectMutation.isPending ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <RefreshCw size={16} />
             )}
-            Refresh metrics
+            {t('analytics.refreshMetrics')}
           </button>
         }
       />
 
       {collectMutation.isSuccess && (
         <div className="alert-success mb-6">
-          Collected metrics for {collectMutation.data?.data?.data?.collected ?? 0} post(s).
+          {t('analytics.collectSuccess', { count: collectMutation.data?.data?.data?.collected ?? 0 })}
           {collectMutation.data?.data?.data?.failed > 0 && (
             <span className="ml-1">
-              {collectMutation.data.data.data.failed} failed — check Threads connection.
+              {t('analytics.collectPartial', { count: collectMutation.data.data.data.failed })}
             </span>
           )}
         </div>
@@ -155,7 +160,7 @@ export default function Analytics() {
 
       {collectMutation.isError && (
         <div className="alert-error mb-6">
-          {collectMutation.error?.response?.data?.message || 'Failed to collect analytics'}
+          {collectMutation.error?.response?.data?.message || t('analytics.collectFailed')}
         </div>
       )}
 
@@ -183,16 +188,16 @@ export default function Analytics() {
         <div className="card">
           <EmptyState
             icon={BarChart3}
-            title="No published posts yet"
-            description="Approve and publish content from the Scheduler or Content page. Metrics appear here after posts go live on Threads."
+            title={t('analytics.emptyNoPublishedTitle')}
+            description={t('analytics.emptyNoPublishedDesc')}
           />
         </div>
       ) : showEmptyCharts ? (
         <div className="card">
           <EmptyState
             icon={TrendingUp}
-            title="No metrics collected yet"
-            description="Click Refresh metrics to pull impressions and engagement from the Threads API for your recent posts."
+            title={t('analytics.emptyNoMetricsTitle')}
+            description={t('analytics.emptyNoMetricsDesc')}
             action={
               <button
                 type="button"
@@ -205,7 +210,7 @@ export default function Analytics() {
                 ) : (
                   <RefreshCw size={16} />
                 )}
-                Refresh metrics
+                {t('analytics.refreshMetrics')}
               </button>
             }
           />
@@ -214,8 +219,8 @@ export default function Analytics() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="card p-6">
-              <h2 className="text-heading mb-1 text-lg font-semibold">Engagement trend</h2>
-              <p className="text-muted mb-5 text-sm">Last 30 days of collected metrics</p>
+              <h2 className="text-heading mb-1 text-lg font-semibold">{t('analytics.engagementTrend')}</h2>
+              <p className="text-muted mb-5 text-sm">{t('analytics.engagementTrendDesc')}</p>
               {trendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={260}>
                   <AreaChart data={trendData}>
@@ -227,7 +232,7 @@ export default function Analytics() {
                     <Area
                       type="monotone"
                       dataKey="impressions"
-                      name="Impressions"
+                      name={impressionsLabel}
                       stroke="#6366f1"
                       fill="#6366f1"
                       fillOpacity={0.15}
@@ -236,7 +241,7 @@ export default function Analytics() {
                     <Area
                       type="monotone"
                       dataKey="engagement"
-                      name="Engagement"
+                      name={engagementLabel}
                       stroke="#10b981"
                       fill="#10b981"
                       fillOpacity={0.15}
@@ -245,13 +250,13 @@ export default function Analytics() {
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-muted py-16 text-center text-sm">No trend data yet — refresh metrics to populate.</p>
+                <p className="text-muted py-16 text-center text-sm">{t('analytics.noTrendData')}</p>
               )}
             </div>
 
             <div className="card p-6">
-              <h2 className="text-heading mb-1 text-lg font-semibold">Top posts</h2>
-              <p className="text-muted mb-5 text-sm">Ranked by total engagement</p>
+              <h2 className="text-heading mb-1 text-lg font-semibold">{t('analytics.topPosts')}</h2>
+              <p className="text-muted mb-5 text-sm">{t('analytics.topPostsDesc')}</p>
               {postsData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={postsData} layout="vertical" margin={{ left: 8, right: 16 }}>
@@ -264,19 +269,19 @@ export default function Analytics() {
                       tick={{ fill: theme.axis, fontSize: 10 }}
                     />
                     <Tooltip content={<ChartTooltip theme={theme} />} />
-                    <Bar dataKey="engagement" name="Engagement" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="engagement" name={engagementLabel} fill="#8b5cf6" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-muted py-16 text-center text-sm">No post metrics yet.</p>
+                <p className="text-muted py-16 text-center text-sm">{t('analytics.noPostMetrics')}</p>
               )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="card p-6">
-              <h2 className="text-heading mb-1 text-lg font-semibold">Best posting times</h2>
-              <p className="text-muted mb-5 text-sm">Day and hour combinations with highest engagement</p>
+              <h2 className="text-heading mb-1 text-lg font-semibold">{t('analytics.bestTimes')}</h2>
+              <p className="text-muted mb-5 text-sm">{t('analytics.bestTimesDesc')}</p>
               {timesData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={timesData}>
@@ -284,19 +289,19 @@ export default function Analytics() {
                     <XAxis dataKey="label" tick={{ fill: theme.axis, fontSize: 10 }} />
                     <YAxis tick={{ fill: theme.axis, fontSize: 11 }} />
                     <Tooltip content={<ChartTooltip theme={theme} />} />
-                    <Bar dataKey="engagement" name="Engagement" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="engagement" name={engagementLabel} fill="#f59e0b" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <p className="text-muted py-16 text-center text-sm">
-                  Posting time insights appear after metrics are collected.
+                  {t('analytics.noPostingTimes')}
                 </p>
               )}
             </div>
 
             <div className="card p-6">
-              <h2 className="text-heading mb-1 text-lg font-semibold">Top hooks</h2>
-              <p className="text-muted mb-5 text-sm">Hooks from published posts by engagement</p>
+              <h2 className="text-heading mb-1 text-lg font-semibold">{t('analytics.topHooks')}</h2>
+              <p className="text-muted mb-5 text-sm">{t('analytics.topHooksDesc')}</p>
               {bestHooks.length > 0 ? (
                 <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                   {bestHooks.map((post) => (
@@ -307,14 +312,18 @@ export default function Analytics() {
                       <div className="min-w-0 flex-1">
                         <p className="text-subheading line-clamp-2 text-sm font-medium">{post.hook}</p>
                         <p className="text-muted mt-0.5 text-xs">
-                          {post.category} · {post.tone} · {Number(post.engagement).toLocaleString()} engagement
+                          {t('analytics.hookMeta', {
+                            category: post.category,
+                            tone: post.tone,
+                            engagement: Number(post.engagement).toLocaleString(),
+                          })}
                         </p>
                       </div>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-muted py-16 text-center text-sm">No hook data yet.</p>
+                <p className="text-muted py-16 text-center text-sm">{t('analytics.noHookData')}</p>
               )}
             </div>
           </div>

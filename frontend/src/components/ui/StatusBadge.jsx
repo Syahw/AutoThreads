@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { useTranslation } from '../../i18n';
 
 const styles = {
   draft: 'badge-draft',
@@ -11,9 +12,14 @@ const styles = {
 };
 
 export default function StatusBadge({ status }) {
+  const { t } = useTranslation();
+  const label = t(`status.${status}`, {}) !== `status.${status}`
+    ? t(`status.${status}`)
+    : status;
+
   return (
     <span className={clsx(styles[status] || 'badge-draft', 'capitalize')}>
-      {status}
+      {label}
     </span>
   );
 }

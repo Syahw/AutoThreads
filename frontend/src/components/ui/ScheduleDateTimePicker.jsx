@@ -8,6 +8,14 @@ import {
   parseDatetimeLocal,
   todayDateString,
 } from '../../utils/schedule';
+import { useTranslation } from '../../i18n';
+
+const PRESET_LABEL_KEYS = {
+  '1h': 'settings.presetIn1Hour',
+  midnight: 'settings.presetTonight',
+  'tomorrow-am': 'settings.presetTomorrow9',
+  'tomorrow-pm': 'settings.presetTomorrow6',
+};
 
 export default function ScheduleDateTimePicker({
   value,
@@ -16,6 +24,7 @@ export default function ScheduleDateTimePicker({
   settings = null,
   className,
 }) {
+  const { t } = useTranslation();
   const { date, hour, minute } = parseDatetimeLocal(value);
   const earliest = settings?.earliest_hour ?? 0;
   const latest = settings?.latest_hour ?? 23;
@@ -46,7 +55,7 @@ export default function ScheduleDateTimePicker({
                   : 'border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-slate-500'
               )}
             >
-              {preset.label}
+              {PRESET_LABEL_KEYS[preset.id] ? t(PRESET_LABEL_KEYS[preset.id]) : preset.label}
             </button>
           ))}
         </div>
@@ -56,7 +65,7 @@ export default function ScheduleDateTimePicker({
         <div>
           <label className="text-label mb-1.5 flex items-center gap-1.5 text-xs font-medium">
             <Calendar size={12} className="text-brand-500 dark:text-brand-400" />
-            Date
+            {t('common.date')}
           </label>
           <input
             type="date"
@@ -71,7 +80,7 @@ export default function ScheduleDateTimePicker({
         <div className="sm:min-w-[9rem]">
           <label className="text-label mb-1.5 flex items-center gap-1.5 text-xs font-medium">
             <Clock size={12} className="text-brand-500 dark:text-brand-400" />
-            Time
+            {t('common.time')}
           </label>
           <input
             type="time"
@@ -83,7 +92,7 @@ export default function ScheduleDateTimePicker({
               update({ hour: h, minute: m });
             }}
             className="input-field w-full [color-scheme:light] dark:[color-scheme:dark]"
-            aria-label="Time"
+            aria-label={t('common.time')}
           />
         </div>
       </div>
@@ -103,7 +112,7 @@ export default function ScheduleDateTimePicker({
             {settings && (
               <p className="mt-0.5 text-xs opacity-80">
                 {settings.timezone}
-                {!inWindow && ` · Pick a time between ${earliest}:00 and ${latest}:59`}
+                {!inWindow && ` · ${t('schedulePicker.outsideWindow', { earliest, latest })}`}
               </p>
             )}
           </div>

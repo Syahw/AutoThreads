@@ -4,10 +4,12 @@ import api from '../services/api';
 import { Plus, Tag, Pencil, Trash2, Loader2, Save, X } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
+import { useTranslation } from '../i18n';
 
 const emptyForm = { name: '', description: '', target_audience: '' };
 
 export default function Niches() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -29,7 +31,7 @@ export default function Niches() {
       setFormError('');
     },
     onError: (err) => {
-      setFormError(err.response?.data?.message || 'Could not create niche');
+      setFormError(err.response?.data?.message || t('niches.createFailed'));
     },
   });
 
@@ -42,7 +44,7 @@ export default function Niches() {
       setFormError('');
     },
     onError: (err) => {
-      setFormError(err.response?.data?.message || 'Could not update niche');
+      setFormError(err.response?.data?.message || t('niches.updateFailed'));
     },
   });
 
@@ -53,7 +55,7 @@ export default function Niches() {
       if (editingId) setEditingId(null);
     },
     onError: (err) => {
-      setFormError(err.response?.data?.message || 'Could not delete niche');
+      setFormError(err.response?.data?.message || t('niches.deleteFailed'));
     },
   });
 
@@ -96,7 +98,7 @@ export default function Niches() {
   };
 
   const handleDelete = (niche) => {
-    if (!window.confirm(`Delete niche "${niche.name}"? This cannot be undone.`)) return;
+    if (!window.confirm(t('niches.deleteConfirm', { name: niche.name }))) return;
     setFormError('');
     deleteMutation.mutate(niche.id);
   };
@@ -104,15 +106,15 @@ export default function Niches() {
   return (
     <div>
       <PageHeader
-        title="Niches"
-        description="Organize content by topic and target audience for better AI prompts."
+        title={t('niches.title')}
+        description={t('niches.description')}
         action={
           <button
             type="button"
             onClick={() => { setShowForm(!showForm); setFormError(''); }}
             className="btn-primary"
           >
-            <Plus size={16} /> Add niche
+            <Plus size={16} /> {t('niches.addNiche')}
           </button>
         }
       />
@@ -123,16 +125,16 @@ export default function Niches() {
 
       {showForm && (
         <form onSubmit={handleCreate} className="card mb-6 p-6">
-          <h2 className="text-heading mb-4 text-lg font-semibold">New niche</h2>
+          <h2 className="text-heading mb-4 text-lg font-semibold">{t('niches.newNiche')}</h2>
           {formError && <div className="alert-error mb-4">{formError}</div>}
           <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
               <label htmlFor="create-name" className="text-label mb-1.5 block text-sm font-medium">
-                Name *
+                {t('niches.nameRequired')}
               </label>
               <input
                 id="create-name"
-                placeholder="Niche name"
+                placeholder={t('niches.nicheName')}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="input-field"
@@ -141,11 +143,11 @@ export default function Niches() {
             </div>
             <div>
               <label htmlFor="create-description" className="text-label mb-1.5 block text-sm font-medium">
-                Description
+                {t('common.description')}
               </label>
               <input
                 id="create-description"
-                placeholder="Description"
+                placeholder={t('common.description')}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 className="input-field"
@@ -153,11 +155,11 @@ export default function Niches() {
             </div>
             <div>
               <label htmlFor="create-audience" className="text-label mb-1.5 block text-sm font-medium">
-                Target audience
+                {t('niches.targetAudience')}
               </label>
               <input
                 id="create-audience"
-                placeholder="Target audience"
+                placeholder={t('niches.targetAudience')}
                 value={form.target_audience}
                 onChange={(e) => setForm({ ...form, target_audience: e.target.value })}
                 className="input-field"
@@ -167,10 +169,10 @@ export default function Niches() {
           <div className="flex flex-wrap gap-2">
             <button type="submit" disabled={createMutation.isPending} className="btn-success">
               {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              Create niche
+              {t('niches.createNiche')}
             </button>
             <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="btn-secondary">
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </form>
@@ -184,7 +186,7 @@ export default function Niches() {
         </div>
       ) : niches?.length === 0 ? (
         <div className="card">
-          <EmptyState icon={Tag} title="No niches yet" description="Create a niche to tailor generated content." />
+          <EmptyState icon={Tag} title={t('niches.emptyTitle')} description={t('niches.emptyDesc')} />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -192,24 +194,24 @@ export default function Niches() {
             <div key={niche.id} className="card-hover p-5">
               {editingId === niche.id ? (
                 <form onSubmit={handleUpdate}>
-                  <h3 className="text-heading mb-3 text-sm font-semibold">Edit niche</h3>
+                  <h3 className="text-heading mb-3 text-sm font-semibold">{t('niches.editNiche')}</h3>
                   {formError && <div className="alert-error mb-3 text-xs">{formError}</div>}
                   <div className="space-y-3">
                     <input
-                      placeholder="Niche name"
+                      placeholder={t('niches.nicheName')}
                       value={editForm.name}
                       onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                       className="input-field !py-2 text-sm"
                       required
                     />
                     <input
-                      placeholder="Description"
+                      placeholder={t('common.description')}
                       value={editForm.description}
                       onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                       className="input-field !py-2 text-sm"
                     />
                     <input
-                      placeholder="Target audience"
+                      placeholder={t('niches.targetAudience')}
                       value={editForm.target_audience}
                       onChange={(e) => setEditForm({ ...editForm, target_audience: e.target.value })}
                       className="input-field !py-2 text-sm"
@@ -218,10 +220,10 @@ export default function Niches() {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button type="submit" disabled={updateMutation.isPending} className="btn-primary !py-2 !text-xs">
                       {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                      Save
+                      {t('common.save')}
                     </button>
                     <button type="button" onClick={cancelEdit} className="btn-secondary !py-2 !text-xs">
-                      <X size={14} /> Cancel
+                      <X size={14} /> {t('common.cancel')}
                     </button>
                   </div>
                 </form>
@@ -239,7 +241,7 @@ export default function Niches() {
                         type="button"
                         onClick={() => startEdit(niche)}
                         className="btn-ghost !p-2"
-                        title="Edit niche"
+                        title={t('niches.editNiche')}
                       >
                         <Pencil size={16} />
                       </button>
@@ -248,20 +250,20 @@ export default function Niches() {
                         onClick={() => handleDelete(niche)}
                         disabled={deleteMutation.isPending}
                         className="btn-ghost !p-2 text-red-600 dark:text-red-400"
-                        title="Delete niche"
+                        title={t('niches.deleteNicheTitle')}
                       >
                         {deleteMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                       </button>
                     </div>
                   </div>
-                  <p className="text-muted line-clamp-2 text-sm">{niche.description || 'No description'}</p>
+                  <p className="text-muted line-clamp-2 text-sm">{niche.description || t('common.noDescription')}</p>
                   {niche.target_audience && (
                     <p className="text-muted mt-2 text-xs">
-                      Audience: {niche.target_audience}
+                      {t('niches.audience')} {niche.target_audience}
                     </p>
                   )}
                   <p className="mt-3 text-xs font-medium text-slate-400 dark:text-slate-500">
-                    {niche.post_count ?? 0} posts
+                    {t('niches.postCount', { count: niche.post_count ?? 0 })}
                   </p>
                 </>
               )}

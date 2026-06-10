@@ -5,8 +5,11 @@ import { BarChart3, Sparkles, Calendar, TrendingUp, ArrowRight, Zap } from 'luci
 import PageHeader from '../components/ui/PageHeader';
 import StatCard from '../components/ui/StatCard';
 import { AnnouncementList } from '../components/AnnouncementBanner';
+import { useTranslation } from '../i18n';
 
 export default function Dashboard() {
+  const { t } = useTranslation();
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/dashboard/stats').then((r) => r.data.data),
@@ -23,16 +26,16 @@ export default function Dashboard() {
   }
 
   const cards = [
-    { label: 'Total Posts', value: stats?.total_posts ?? 0, icon: Sparkles, accent: 'brand' },
-    { label: 'Scheduled', value: stats?.scheduled_pending ?? 0, icon: Calendar, accent: 'amber' },
-    { label: 'Posted This Week', value: stats?.posted_this_week ?? 0, icon: TrendingUp, accent: 'emerald' },
-    { label: 'Avg Quality', value: `${stats?.avg_quality_score ?? 0}/100`, icon: BarChart3, accent: 'violet' },
+    { label: t('dashboard.totalPosts'), value: stats?.total_posts ?? 0, icon: Sparkles, accent: 'brand' },
+    { label: t('dashboard.scheduled'), value: stats?.scheduled_pending ?? 0, icon: Calendar, accent: 'amber' },
+    { label: t('dashboard.postedThisWeek'), value: stats?.posted_this_week ?? 0, icon: TrendingUp, accent: 'emerald' },
+    { label: t('dashboard.avgQuality'), value: `${stats?.avg_quality_score ?? 0}/100`, icon: BarChart3, accent: 'violet' },
   ];
 
   const quickLinks = [
-    { to: '/content', label: 'Generate new content', desc: 'AI threads in Bahasa Melayu', color: 'brand' },
-    { to: '/scheduler', label: 'View scheduled posts', desc: 'Queue and timing', color: 'amber' },
-    { to: '/analytics', label: 'Check analytics', desc: 'Performance insights', color: 'emerald' },
+    { to: '/content', label: t('dashboard.generateLabel'), desc: t('dashboard.generateDesc'), color: 'brand' },
+    { to: '/scheduler', label: t('dashboard.schedulerLabel'), desc: t('dashboard.schedulerDesc'), color: 'amber' },
+    { to: '/analytics', label: t('dashboard.analyticsLabel'), desc: t('dashboard.analyticsDesc'), color: 'emerald' },
   ];
 
   const linkStyles = {
@@ -41,11 +44,17 @@ export default function Dashboard() {
     emerald: 'hover:border-emerald-200 hover:bg-emerald-50/50 group-hover:text-emerald-700 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10 dark:group-hover:text-emerald-300',
   };
 
+  const systemStatus = [
+    { label: t('dashboard.totalImpressions'), value: stats?.total_impressions?.toLocaleString() ?? 0 },
+    { label: t('dashboard.totalEngagement'), value: stats?.total_engagement?.toLocaleString() ?? 0 },
+    { label: t('dashboard.failedPosts'), value: stats?.failed_posts ?? 0, danger: true },
+  ];
+
   return (
     <div>
       <PageHeader
-        title="Welcome back"
-        description="Overview of your content pipeline, scheduling, and Threads publishing."
+        title={t('dashboard.title')}
+        description={t('dashboard.description')}
       />
 
       <AnnouncementList announcements={stats?.announcements} />
@@ -60,7 +69,7 @@ export default function Dashboard() {
         <div className="card p-6">
           <div className="mb-5 flex items-center gap-2">
             <Zap size={18} className="text-brand-500 dark:text-brand-400" />
-            <h2 className="text-heading text-lg font-semibold">Quick actions</h2>
+            <h2 className="text-heading text-lg font-semibold">{t('dashboard.quickActions')}</h2>
           </div>
           <div className="space-y-3">
             {quickLinks.map(({ to, label, desc, color }) => (
@@ -80,13 +89,9 @@ export default function Dashboard() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-heading mb-5 text-lg font-semibold">System status</h2>
+          <h2 className="text-heading mb-5 text-lg font-semibold">{t('dashboard.systemStatus')}</h2>
           <dl className="space-y-4">
-            {[
-              { label: 'Total impressions', value: stats?.total_impressions?.toLocaleString() ?? 0 },
-              { label: 'Total engagement', value: stats?.total_engagement?.toLocaleString() ?? 0 },
-              { label: 'Failed posts', value: stats?.failed_posts ?? 0, danger: true },
-            ].map(({ label, value, danger }) => (
+            {systemStatus.map(({ label, value, danger }) => (
               <div key={label} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0 dark:border-slate-800">
                 <dt className="text-muted text-sm">{label}</dt>
                 <dd className={`text-sm font-semibold ${danger ? 'text-red-600 dark:text-red-400' : 'text-heading'}`}>{value}</dd>

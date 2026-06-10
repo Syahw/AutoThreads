@@ -4,10 +4,12 @@ import api from '../services/api';
 import { Link2, MousePointerClick, Plus, Loader2, Trash2 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
+import { useTranslation } from '../i18n';
 
 const ctaStyles = ['soft', 'direct', 'curiosity', 'urgency', 'social_proof'];
 
 export default function Affiliates() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [formError, setFormError] = useState('');
@@ -32,7 +34,7 @@ export default function Affiliates() {
       setForm({ product_name: '', url: '', short_url: '', cta_style: 'soft' });
     },
     onError: (err) => {
-      setFormError(err.response?.data?.message || 'Could not save link');
+      setFormError(err.response?.data?.message || t('affiliates.saveFailed'));
     },
   });
 
@@ -58,20 +60,20 @@ export default function Affiliates() {
   return (
     <div>
       <PageHeader
-        title="Affiliate links"
-        description="Save product URLs here. They appear in Content Generator when you generate or publish threads with [link]."
+        title={t('affiliates.title')}
+        description={t('affiliates.description')}
         action={
           <button type="button" onClick={() => setShowForm(!showForm)} className="btn-primary">
-            <Plus size={16} /> Add link
+            <Plus size={16} /> {t('affiliates.addLink')}
           </button>
         }
       />
 
       {showForm && (
         <form onSubmit={handleSubmit} className="card mb-6 p-6">
-          <h2 className="text-heading mb-1 text-lg font-semibold">New affiliate link</h2>
+          <h2 className="text-heading mb-1 text-lg font-semibold">{t('affiliates.newLink')}</h2>
           <p className="text-muted mb-4 text-sm">
-            Product name is shown to the AI. URL replaces <code className="code-inline">[link]</code> when you publish.
+            {t('affiliates.newLinkDesc')}
           </p>
 
           {formError && <div className="alert-error mb-4">{formError}</div>}
@@ -79,7 +81,7 @@ export default function Affiliates() {
           <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label htmlFor="product_name" className="text-label mb-1.5 block text-sm font-medium">
-                Product name *
+                {t('affiliates.productName')}
               </label>
               <input
                 id="product_name"
@@ -87,13 +89,13 @@ export default function Affiliates() {
                 value={form.product_name}
                 onChange={(e) => setForm({ ...form, product_name: e.target.value })}
                 className="input-field"
-                placeholder="e.g. Notion Pro"
+                placeholder={t('affiliates.productPlaceholder')}
                 required
               />
             </div>
             <div>
               <label htmlFor="cta_style" className="text-label mb-1.5 block text-sm font-medium">
-                CTA style
+                {t('affiliates.ctaStyle')}
               </label>
               <select
                 id="cta_style"
@@ -102,13 +104,13 @@ export default function Affiliates() {
                 className="select-field"
               >
                 {ctaStyles.map((s) => (
-                  <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                  <option key={s} value={s}>{t(`affiliates.ctaStyles.${s}`)}</option>
                 ))}
               </select>
             </div>
             <div className="md:col-span-2">
               <label htmlFor="url" className="text-label mb-1.5 block text-sm font-medium">
-                Affiliate URL *
+                {t('affiliates.affiliateUrl')}
               </label>
               <input
                 id="url"
@@ -116,13 +118,13 @@ export default function Affiliates() {
                 value={form.url}
                 onChange={(e) => setForm({ ...form, url: e.target.value })}
                 className="input-field"
-                placeholder="https://..."
+                placeholder={t('affiliates.urlPlaceholder')}
                 required
               />
             </div>
             <div className="md:col-span-2">
               <label htmlFor="short_url" className="text-label mb-1.5 block text-sm font-medium">
-                Short URL (optional)
+                {t('affiliates.shortUrl')}
               </label>
               <input
                 id="short_url"
@@ -130,7 +132,7 @@ export default function Affiliates() {
                 value={form.short_url}
                 onChange={(e) => setForm({ ...form, short_url: e.target.value })}
                 className="input-field"
-                placeholder="https://bit.ly/... — used on publish if set"
+                placeholder={t('affiliates.shortUrlPlaceholder')}
               />
             </div>
           </div>
@@ -138,10 +140,10 @@ export default function Affiliates() {
           <div className="flex flex-wrap gap-2">
             <button type="submit" disabled={createMutation.isPending} className="btn-success">
               {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              Save link
+              {t('affiliates.saveLink')}
             </button>
             <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </form>
@@ -157,11 +159,11 @@ export default function Affiliates() {
         ) : !links?.length ? (
           <EmptyState
             icon={Link2}
-            title="No affiliate links yet"
-            description="Add your first Shopee, Lazada, or other affiliate URL above."
+            title={t('affiliates.emptyTitle')}
+            description={t('affiliates.emptyDesc')}
             action={
               <button type="button" onClick={() => setShowForm(true)} className="btn-primary">
-                <Plus size={16} /> Add your first link
+                <Plus size={16} /> {t('affiliates.addFirstLink')}
               </button>
             }
           />
@@ -180,13 +182,15 @@ export default function Affiliates() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="badge-draft">{link.cta_style?.replace(/_/g, ' ')}</span>
+                    <span className="badge-draft">
+                      {link.cta_style ? t(`affiliates.ctaStyles.${link.cta_style}`) : ''}
+                    </span>
                     <button
                       type="button"
                       onClick={() => deleteMutation.mutate(link.id)}
                       disabled={deleteMutation.isPending}
                       className="btn-ghost !p-2 text-red-600 dark:text-red-400"
-                      title="Delete link"
+                      title={t('affiliates.deleteLink')}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -195,9 +199,9 @@ export default function Affiliates() {
                 <div className="text-muted mt-3 flex flex-wrap gap-4 text-xs">
                   <span className="flex items-center gap-1">
                     <MousePointerClick size={12} />
-                    {link.click_count ?? 0} clicks
+                    {t('affiliates.clicks', { count: link.click_count ?? 0 })}
                   </span>
-                  <span>Campaign: {link.campaign_tag || 'none'}</span>
+                  <span>{t('affiliates.campaign', { tag: link.campaign_tag || t('affiliates.none') })}</span>
                 </div>
               </li>
             ))}

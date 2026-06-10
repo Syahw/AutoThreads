@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, XCircle, Zap, Play, Activity, Clock, AlertTriangle, Timer } from 'lucide-react';
 import api from '../../services/api';
 import PageHeader from '../../components/ui/PageHeader';
+import { useTranslation } from '../../i18n';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
 import AdminTabs from '../../components/admin/AdminTabs';
@@ -192,12 +193,13 @@ function WorkerTab() {
 
 export default function AdminPublishing() {
   const [tab, setTab] = useState('queue');
+  const { t } = useTranslation();
 
   return (
     <div>
       <PageHeader
-        title="Publishing monitor"
-        description="Content queue and publish worker — switch tabs to debug failed posts."
+        title={t('admin.publishingTitle')}
+        description={t('admin.publishingDesc')}
       />
       <AdminTabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === 'queue' ? <QueueTab /> : <WorkerTab />}

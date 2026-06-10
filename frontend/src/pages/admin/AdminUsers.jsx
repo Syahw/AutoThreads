@@ -4,15 +4,16 @@ import { Search, UserCog, Ban, PauseCircle, RotateCcw, LogIn, CreditCard, Clock,
 import api from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import PageHeader from '../../components/ui/PageHeader';
+import { useTranslation } from '../../i18n';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
 import AdminTabs from '../../components/admin/AdminTabs';
 import { formatDate } from '../../utils/date';
 
 const PLANS = ['free', 'starter', 'pro', 'premium'];
-const TABS = [
-  { id: 'users', label: 'Users' },
-  { id: 'subscriptions', label: 'Subscriptions' },
+const TAB_IDS = [
+  { id: 'users', labelKey: 'admin.tabUsers' },
+  { id: 'subscriptions', labelKey: 'admin.tabSubscriptions' },
 ];
 
 function UsersTab() {
@@ -281,14 +282,16 @@ function SubscriptionsTab() {
 
 export default function AdminUsers() {
   const [tab, setTab] = useState('users');
+  const { t } = useTranslation();
+  const tabs = TAB_IDS.map((item) => ({ id: item.id, label: t(item.labelKey) }));
 
   return (
     <div>
       <PageHeader
-        title="Users & subscriptions"
-        description="Manage accounts, plans, trials, and billing actions."
+        title={t('admin.usersTitle')}
+        description={t('admin.usersDesc')}
       />
-      <AdminTabs tabs={TABS} active={tab} onChange={setTab} />
+      <AdminTabs tabs={tabs} active={tab} onChange={setTab} />
       {tab === 'users' ? <UsersTab /> : <SubscriptionsTab />}
     </div>
   );

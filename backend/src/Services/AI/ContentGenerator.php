@@ -104,7 +104,13 @@ class ContentGenerator
             'target_audience' => $niche?->target_audience,
             'cta_style'       => $affiliateLink?->cta_style ?? 'soft',
             'diversity_hint'  => $this->diversityManager->buildDiversityHint(),
+            'hook_instruction' => $config['hook_instruction'] ?? null,
+            'thread_length'   => $config['thread_length'] ?? null,
+            'product_context' => $config['product_context'] ?? null,
+            'language' => $config['language'] ?? 'bm',
         ]);
+
+        $language = $prompt['language'] ?? ($config['language'] ?? 'bm');
 
         // 2. Generate
         $aiResponse  = $this->callOpenAI($prompt['system'], $prompt['user']);
@@ -114,7 +120,7 @@ class ContentGenerator
         $reviewApplied = false;
         $contentToProcess = $aiResponse['content'];
         try {
-            $reviewResult     = $this->reviewer->review($aiResponse['content']);
+            $reviewResult     = $this->reviewer->review($aiResponse['content'], $language);
             $contentToProcess = $reviewResult['content'];
             $totalTokens     += $reviewResult['tokens_used'];
             $reviewApplied    = true;
@@ -212,7 +218,13 @@ class ContentGenerator
             'affiliate' => $affiliateLink,
             'target_audience' => $niche?->target_audience,
             'cta_style' => $affiliateLink?->cta_style ?? 'soft',
+            'hook_instruction' => $config['hook_instruction'] ?? null,
+            'thread_length' => $config['thread_length'] ?? null,
+            'product_context' => $config['product_context'] ?? null,
+            'language' => $config['language'] ?? 'bm',
         ]);
+
+        $language = $prompt['language'] ?? ($config['language'] ?? 'bm');
 
         $systemPrompt = trim($prompt['system'] . "\n\n" . $this->promptBuilder->buildVisionSystemAddendum());
         $visionUserPrompt = $this->promptBuilder->buildVisionUserPrompt(
@@ -230,7 +242,7 @@ class ContentGenerator
         $reviewApplied = false;
         $contentToProcess = $threadContent;
         try {
-            $reviewResult     = $this->reviewer->review($threadContent);
+            $reviewResult     = $this->reviewer->review($threadContent, $language);
             $contentToProcess = $reviewResult['content'];
             $reviewApplied    = true;
         } catch (\Throwable $e) {

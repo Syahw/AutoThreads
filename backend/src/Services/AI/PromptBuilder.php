@@ -41,6 +41,18 @@ class PromptBuilder
         'general' => 'Buat content Threads yang engaging tentang {niche} yang secara halus mention {product}. Utamakan value berbanding promosi.',
     ];
 
+    private array $categoryTemplatesEn = [
+        'story' => 'Write a short personal story or experience that naturally leads to recommending {product}. Make it feel like telling a friend.',
+        'product_recommendation' => 'Write a genuine product recommendation for {product}, like organic advice not an ad. Focus on one specific benefit.',
+        'comparison' => 'Share a real experience with {product}, what changed, what was unexpected. Avoid rigid pro/con templates.',
+        'productivity_tip' => 'Share a productivity tip that naturally includes {product} as part of the workflow. Make it actionable.',
+        'viral_hook' => 'Write a scroll-stopping hook followed by valuable insight connected to {product}. Prioritize curiosity gap.',
+        'opinion' => 'Share a bold opinion about {niche} that naturally leads to mentioning {product} as a solution. Stay authentic.',
+        'list_post' => 'Write an "X things" style post where one item naturally features {product}. Keep each point concise.',
+        'wish_i_knew' => 'Write a "things I wish I knew earlier" post about {niche} that includes discovering {product} as one insight.',
+        'general' => 'Write engaging Threads content about {niche} that subtly mentions {product}. Prioritize value over promotion.',
+    ];
+
     /** Templates when no product / affiliate, sharing & engagement only */
     private array $sharingCategoryTemplates = [
         'story' => 'Tulis cerita pendek atau pengalaman peribadi tentang {niche}. Kongsi macam cerita dengan kawan, tiada jualan.',
@@ -54,6 +66,18 @@ class PromptBuilder
         'general' => 'Buat content Threads yang engaging tentang {niche}. Utamakan value, storytelling, atau hot take, bukan promosi.',
     ];
 
+    private array $sharingCategoryTemplatesEn = [
+        'story' => 'Write a short personal story or experience about {niche}. Share it like telling a friend, no selling.',
+        'product_recommendation' => 'Share one genuinely helpful tip or discovery about {niche}. Not a product ad.',
+        'comparison' => 'Share a personal experience in {niche}, what you discovered — not a rigid pro/con essay.',
+        'productivity_tip' => 'Share a productivity tip about {niche}. Make it actionable and relatable.',
+        'viral_hook' => 'Write a scroll-stopping hook followed by valuable insight about {niche}. Prioritize curiosity gap.',
+        'opinion' => 'Share a bold opinion about {niche}. Be authentic, invite discussion, no selling.',
+        'list_post' => 'Write an "X things" style post about {niche}. Keep each point concise and valuable.',
+        'wish_i_knew' => 'Write a "things I wish I knew earlier" post about {niche}. End with reflection or a question.',
+        'general' => 'Write engaging Threads content about {niche}. Prioritize value, storytelling, or hot takes, not promotion.',
+    ];
+
     /**
      * Build a complete prompt from configuration
      */
@@ -65,15 +89,27 @@ class PromptBuilder
         $affiliate = $config['affiliate'] ?? null;
         $targetAudience = $config['target_audience'] ?? 'general audience';
         $ctaStyle = $config['cta_style'] ?? 'soft';
+        $language = $this->normalizeLanguage($config['language'] ?? 'bm');
 
         // Select tone (use requested or rotate)
         $tone = $requestedTone ?? $this->getRotatedTone();
         $style = $this->getRotatedStyle();
 
-        $replyCount = $this->getRandomReplyCount();
+        $threadLength = $config['thread_length'] ?? null;
+        $replyCount = $this->getReplyCountForLength($threadLength);
 
-        $systemPrompt = $this->buildSystemPrompt($tone, $style, $targetAudience, $replyCount, $config['diversity_hint'] ?? '');
-        $userPrompt = $this->buildUserPrompt($category, $niche, $affiliate, $ctaStyle, $replyCount);
+        $systemPrompt = $this->buildSystemPrompt($tone, $style, $targetAudience, $replyCount, $config['diversity_hint'] ?? '', $language, $threadLength);
+        $userPrompt = $this->buildUserPrompt($category, $niche, $affiliate, $ctaStyle, $replyCount, $language);
+
+        $productContext = trim((string) ($config['product_context'] ?? ''));
+        if ($productContext !== '') {
+            $userPrompt .= "\n\nPRODUCT CONTEXT: {$productContext}";
+        }
+
+        $hookInstruction = trim((string) ($config['hook_instruction'] ?? ''));
+        if ($hookInstruction !== '') {
+            $userPrompt .= "\n\n" . $hookInstruction;
+        }
 
         return [
             'system' => $systemPrompt,
@@ -81,7 +117,15 @@ class PromptBuilder
             'tone_used' => $tone,
             'style_used' => $style,
             'reply_count' => $replyCount,
+            'language' => $language,
         ];
+    }
+
+    private function normalizeLanguage(?string $language): string
+    {
+        $language = strtolower(trim((string) $language));
+
+        return $language === 'en' ? 'en' : 'bm';
     }
 
     /**
@@ -100,13 +144,21 @@ class PromptBuilder
         return $this->writingStyles[array_rand($this->writingStyles)];
     }
 
-    private function getRandomReplyCount(): int
+    private function getReplyCountForLength(?string $length): int
     {
-        return random_int(5, 7);
+        return match (strtolower(trim((string) $length))) {
+            'short' => random_int(4, 5),
+            'long' => random_int(6, 7),
+            default => random_int(5, 6),
+        };
     }
 
-    private function buildSystemPrompt(string $tone, string $style, string $audience, int $replyCount, string $diversityHint = ''): string
+    private function buildSystemPrompt(string $tone, string $style, string $audience, int $replyCount, string $diversityHint = '', string $language = 'bm', ?string $threadLength = null): string
     {
+        if ($language === 'en') {
+            return $this->buildSystemPromptEn($tone, $style, $audience, $replyCount, $diversityHint, $threadLength);
+        }
+
         // Add randomness to thread flow
         $flowVariations = [
             'Thread ni boleh slow burn, ambil masa build scene sebelum sampai point.',
@@ -119,6 +171,7 @@ class PromptBuilder
         ];
 
         $randomFlow = $flowVariations[array_rand($flowVariations)];
+        $lengthHint = $this->threadLengthHint($threadLength, 'bm');
 
         return <<<PROMPT
         Kau seorang penulis Threads biasa, bukan influencer, bukan copywriter iklan. Semua output WAJIB dalam Bahasa Malaysia.
@@ -127,6 +180,7 @@ class PromptBuilder
 
         PANJANG THREAD (GENERATION INI):
         - Tulis {$replyCount} replies
+        - {$lengthHint}
         - Setiap reply WAJIB substantif, bukan one-liner kosong
         - Hook biasanya sekitar 20-45 patah perkataan, tapi ikut rasa natural
         - Middle replies biasanya 30-80 patah perkataan setiap satu (cerita, detail, konteks, perasaan)
@@ -208,19 +262,143 @@ class PromptBuilder
         PROMPT;
     }
 
-    private function buildUserPrompt(string $category, ?Niche $niche, ?AffiliateLink $affiliate, string $ctaStyle, int $replyCount): string
+    private function threadLengthHint(?string $length, string $language): string
+    {
+        $length = strtolower(trim((string) $length));
+
+        if ($language === 'en') {
+            return match ($length) {
+                'short' => 'Keep pacing tight — shorter scenes, get to the point faster.',
+                'long' => 'Allow slow burn — more scene-setting and gradual reveals across replies.',
+                default => 'Balanced pacing — mix scene-setting with steady progression.',
+            };
+        }
+
+        return match ($length) {
+            'short' => 'Pacing ketat — scene pendek, cepat sampai point.',
+            'long' => 'Slow burn — lebih scene-setting dan reveal beransur.',
+            default => 'Pacing seimbang — campur scene-setting dengan progression steady.',
+        };
+    }
+
+    private function buildSystemPromptEn(string $tone, string $style, string $audience, int $replyCount, string $diversityHint = '', ?string $threadLength = null): string
+    {
+        $flowVariations = [
+            'This thread can slow burn — take time building the scene before the point.',
+            'One reply can tangent randomly but still feel connected.',
+            'The ending can be anticlimactic; real life rarely wraps up neat.',
+            'Middle replies can include specific sensory detail (sound, lighting, mood).',
+            'You can admit you are still unsure about something — uncertainty is human.',
+            'Pacing can feel like typing while doing something else.',
+            'The last reply does not need a CTA — it can just trail off.',
+        ];
+
+        $randomFlow = $flowVariations[array_rand($flowVariations)];
+        $lengthHint = $this->threadLengthHint($threadLength, 'en');
+
+        return <<<PROMPT
+        You are a regular Threads writer, not an influencer or ad copywriter. All output MUST be in English.
+
+        You write a LONG thread (not a single post). The thread must feel like a real person talking to a friend, not a marketing script.
+
+        THREAD LENGTH (THIS GENERATION):
+        - Write {$replyCount} replies
+        - {$lengthHint}
+        - Each reply MUST be substantive, not empty one-liners
+        - Hook is usually around 20-45 words, but follow what feels natural
+        - Middle replies are usually 30-80 words each (story, detail, context, feeling)
+        - Last reply is usually 30-60 words
+        - Total thread target: 400-800+ words overall
+
+        VOICE & STYLE:
+        - Tone: {$tone}, but lower the hype, raise authenticity
+        - Writing style: {$style}
+        - Target audience: {$audience}
+        - Platform: Threads, but this thread is intentionally longer and deeper like a rant/reflection, not a short caption
+
+        SOUND HUMAN (IMPORTANT):
+        - Write like a DM or voice note typed after gaming or doing something — flat, sincere, slightly boring is ok
+        - MUST vary rhythm: long meandering sentences and short plain ones. Do not make every sentence the same energy
+        - Most replies end with a full stop (.), NOT an exclamation mark
+        - Max 1 exclamation mark (!) for the ENTIRE thread, and only if truly natural
+        - Do NOT sound forcibly excited or hyped
+        - Avoid robotic patterns:
+          • "Seriously," / "Legit" / "Best ever" / "So emotional"
+          • "unique vibe" / "hyped" / "adrenaline" / "amazing" / "so satisfied"
+          • "Which one do you pick?" / "Comment below!" (CTA templates)
+          • Every reply asking a rhetorical question
+          • Too-neat pro/con lists (Reply 1 intro, Reply 2 option A, Reply 3 option B...)
+        - If asking a question, max 1 for the whole thread, and keep it casual, not a poll
+
+        LANGUAGE:
+        - Write ENTIRELY in natural, casual English
+        - Correct spelling, no random typos
+        - Use contractions and spoken phrasing where natural
+        - Avoid essay/formal language ("furthermore", "in conclusion", "it is worth noting")
+        - Do NOT use em dash (—) or long dashes in the thread. Use commas, periods, or "but"
+
+        THREAD FLOW:
+        Reply 1 (hook):
+        - Start with a specific moment, thought, or scene — not "let me share"
+        - Do not reveal everything. Pull the reader in slowly
+
+        Middle replies:
+        - Build the story layer by layer with specific detail (place, scene, real feelings)
+        - You can tangent a little like a real person talking
+        - Show don't tell, avoid clichés like "heart racing"
+        - You can admit doubt, confusion, mixed feelings — that is more human
+
+        Last reply:
+        - Soft landing, reflection, half-formed thought, or low-key question
+        - If there is a product/link, mention it naturally here using [link], not hard sell
+        - No "Comment below!" or engagement-bait templates
+
+        STRICT RULES:
+        1. Genuine thought-sharing, NOT a content creator performing excitement
+        2. No AI phrases: "game-changer", "dive into", "unlock", "leverage", "in today's world"
+        3. Do not start consecutive replies with the same pattern ("I remember...", "If you...", "But sometimes...")
+        4. Casual grammar but correct spelling
+        5. Thread is connected but not rigid — can feel messy like real conversation
+        6. Do not repeat points
+        7. Hook must not mention the product
+        8. Link only in the last reply
+        9. NO hashtags
+        10. Prefer periods over exclamation marks
+        11. NO em dash (—) in any reply
+
+        FLOW VARIATION:
+        {$randomFlow}
+
+        ANTI-REPETITION:
+        - Rotate opening styles: scene-setting, mid-thought, quiet observation, specific complaint
+        - Vary sentence length aggressively
+        - Some replies may start lowercase for a casual vibe
+
+        {$diversityHint}
+        OUTPUT FORMAT:
+        Reply 1:
+        Reply 2:
+        (and so on)
+        - No intro/outro outside the thread
+        PROMPT;
+    }
+
+    private function buildUserPrompt(string $category, ?Niche $niche, ?AffiliateLink $affiliate, string $ctaStyle, int $replyCount, string $language = 'bm'): string
     {
         $nicheName = $niche?->name ?? 'general';
         $productName = $affiliate?->product_name ?? '';
         $nicheKeywords = $niche?->keywords ? implode(', ', $niche->keywords) : '';
 
         $isAffiliatePost = $productName !== '';
+        $isEnglish = $language === 'en';
 
         if ($isAffiliatePost) {
-            $template = $this->categoryTemplates[$category] ?? $this->categoryTemplates['general'];
+            $templates = $isEnglish ? $this->categoryTemplatesEn : $this->categoryTemplates;
+            $template = $templates[$category] ?? $templates['general'];
             $template = str_replace('{product}', $productName, $template);
         } else {
-            $template = $this->sharingCategoryTemplates[$category] ?? $this->sharingCategoryTemplates['general'];
+            $templates = $isEnglish ? $this->sharingCategoryTemplatesEn : $this->sharingCategoryTemplates;
+            $template = $templates[$category] ?? $templates['general'];
         }
         $template = str_replace('{niche}', $nicheName, $template);
 
@@ -232,22 +410,39 @@ class PromptBuilder
         }
 
         if ($isAffiliatePost) {
-            $ctaInstruction = $this->getCTAInstruction($ctaStyle);
+            $ctaInstruction = $this->getCTAInstruction($ctaStyle, $language);
             $prompt .= "PRODUCT: {$productName}\n";
             $prompt .= "CTA STYLE: {$ctaInstruction}\n";
-            $prompt .= "LAST REPLY: letak placeholder [link] di mana URL patut masuk (sistem akan ganti dengan URL sebenar semasa publish).\n";
+            if ($isEnglish) {
+                $prompt .= "LAST REPLY: place the [link] placeholder where the URL should go (the system replaces it with the real URL on publish).\n";
+            } else {
+                $prompt .= "LAST REPLY: letak placeholder [link] di mana URL patut masuk (sistem akan ganti dengan URL sebenar semasa publish).\n";
+            }
         } else {
-            $prompt .= "MODE: Kongsi / sharing sahaja. JANGAN letak [link], URL, atau CTA jualan.\n";
-            $prompt .= "LAST REPLY: tutup dengan soalan, refleksi, atau ajak komen, bukan link atau produk.\n";
+            if ($isEnglish) {
+                $prompt .= "MODE: Sharing only. Do NOT include [link], URLs, or sales CTAs.\n";
+                $prompt .= "LAST REPLY: end with a question, reflection, or invite to comment — not a link or product.\n";
+            } else {
+                $prompt .= "MODE: Kongsi / sharing sahaja. JANGAN letak [link], URL, atau CTA jualan.\n";
+                $prompt .= "LAST REPLY: tutup dengan soalan, refleksi, atau ajak komen, bukan link atau produk.\n";
+            }
         }
 
         $prompt .= "\nFORMAT OUTPUT (WAJIB IKUT EXACTLY):\n";
         $prompt .= $this->buildReplyFormatSection($replyCount);
-        $prompt .= "Tulis sepenuhnya dalam Bahasa Melayu (santai, sincere, ejaan betul).\n";
-        $prompt .= "PANJANG: middle replies biasanya 30-80 patah perkataan. Total thread sasaran 400-800+ patah perkataan.\n";
-        $prompt .= "ENERGI: rendah-key, jangan paksa excitement atau tanda seru.\n";
-        $prompt .= "TANDA BACA: jangan guna em dash (—) dalam thread. Guna koma atau titik je.\n";
-        $prompt .= "JANGAN tambah apa-apa text lain selain format di atas. Tulis {$replyCount} replies.\n";
+        if ($isEnglish) {
+            $prompt .= "Write entirely in natural, casual English.\n";
+            $prompt .= "LENGTH: middle replies are usually 30-80 words. Total thread target 400-800+ words.\n";
+            $prompt .= "ENERGY: low-key, do not force excitement or exclamation marks.\n";
+            $prompt .= "PUNCTUATION: do not use em dash (—) in the thread. Use commas or periods.\n";
+            $prompt .= "Do not add any text outside the format above. Write {$replyCount} replies.\n";
+        } else {
+            $prompt .= "Tulis sepenuhnya dalam Bahasa Melayu (santai, sincere, ejaan betul).\n";
+            $prompt .= "PANJANG: middle replies biasanya 30-80 patah perkataan. Total thread sasaran 400-800+ patah perkataan.\n";
+            $prompt .= "ENERGI: rendah-key, jangan paksa excitement atau tanda seru.\n";
+            $prompt .= "TANDA BACA: jangan guna em dash (—) dalam thread. Guna koma atau titik je.\n";
+            $prompt .= "JANGAN tambah apa-apa text lain selain format di atas. Tulis {$replyCount} replies.\n";
+        }
 
         return $prompt;
     }
@@ -341,8 +536,19 @@ class PromptBuilder
         return $hints;
     }
 
-    private function getCTAInstruction(string $style): string
+    private function getCTAInstruction(string $style, string $language = 'bm'): string
     {
+        if ($language === 'en') {
+            return match ($style) {
+                'soft' => 'Mention it like a side note, "I use [link] for this" without hard selling',
+                'direct' => 'Mention [link] naturally in context, not like an ad',
+                'curiosity' => 'Tease without hype — make readers curious, not excited',
+                'urgency' => 'Avoid fake urgency. If mentioning timing, keep it low-key',
+                'social_proof' => 'Avoid "everyone uses this". Prefer personal experience only',
+                default => 'Mention [link] like a normal recommendation, not a CTA template',
+            };
+        }
+
         return match ($style) {
             'soft' => 'Sebut macam side note je, "aku guna [link] ni" tanpa hard sell',
             'direct' => 'Mention [link] naturally dalam context, bukan macam iklan',

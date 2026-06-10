@@ -1,5 +1,6 @@
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
+import { t } from '../i18n';
 
 function isDarkMode() {
   return document.documentElement.classList.contains('dark');
@@ -53,8 +54,8 @@ export async function confirmAction({
   title,
   text,
   html,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText = t('swal.confirm'),
+  cancelText = t('swal.cancel'),
   icon = 'question',
 }) {
   const result = await Swal.fire(baseOptions({
@@ -70,22 +71,20 @@ export async function confirmAction({
   return result.isConfirmed;
 }
 
-export async function confirmDelete(text, title = 'Delete post?') {
+export async function confirmDelete(text, title = t('swal.deletePostTitle')) {
   return confirmAction({
     title,
     text,
-    confirmText: 'Delete',
+    confirmText: t('swal.delete'),
     icon: 'warning',
   });
 }
 
 export async function confirmRevertToDraft(isScheduled) {
   return confirmAction({
-    title: 'Revert to draft?',
-    text: isScheduled
-      ? 'This will cancel the scheduled publish and move the post back to drafts.'
-      : 'This post will move back to drafts so you can edit or approve again.',
-    confirmText: 'Revert to draft',
+    title: t('swal.revertTitle'),
+    text: isScheduled ? t('swal.revertScheduled') : t('swal.revertDefault'),
+    confirmText: t('swal.revertConfirm'),
     icon: 'question',
   });
 }
@@ -95,14 +94,14 @@ export async function confirmRevertToDraft(isScheduled) {
  */
 export async function confirmPostedDelete() {
   const result = await Swal.fire(baseOptions({
-    title: 'Delete published post?',
-    html: '<p class="swal-app-muted">Choose whether to remove the live thread on Threads as well.</p>',
+    title: t('swal.deletePublishedTitle'),
+    html: `<p class="swal-app-muted">${t('swal.deletePublishedBody')}</p>`,
     icon: 'warning',
     showCancelButton: true,
     showDenyButton: true,
-    confirmButtonText: 'Threads + AutoThreads',
-    denyButtonText: 'AutoThreads only',
-    cancelButtonText: 'Cancel',
+    confirmButtonText: t('swal.threadsAndApp'),
+    denyButtonText: t('swal.appOnly'),
+    cancelButtonText: t('swal.cancel'),
   }));
 
   if (result.isConfirmed) {

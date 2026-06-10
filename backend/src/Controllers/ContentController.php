@@ -7,7 +7,10 @@ use AutoThreads\Models\ScheduledPost;
 use AutoThreads\Models\ThreadsAccount;
 use AutoThreads\Services\Threads\ThreadsClient;
 use AutoThreads\Services\AI\ContentGenerator;
+use AutoThreads\Models\Niche;
+use AutoThreads\Services\AI\HookImageAnalyzer;
 use AutoThreads\Services\AI\Humanizer;
+use AutoThreads\Services\AI\ThreadConfigImageAnalyzer;
 use AutoThreads\Services\Media\HookImageStorage;
 use AutoThreads\Services\Media\ImagePreprocessor;
 use AutoThreads\Services\Threads\ThreadPublisher;
@@ -48,18 +51,20 @@ class ContentController
             $query->where('category', $params['category']);
         }
 
-        $posts = $query->orderBy('created_at', 'desc')
-            ->limit($params['limit'] ?? 20)
-            ->offset($params['offset'] ?? 0)
-            ->get();
+        $limit = (int) ($params['limit'] ?? 20);
+        $offset = (int) ($params['offset'] ?? 0);
+        $total = (clone $query)->count();
 
-        $total = $query->count();
+        $posts = $query->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->offset($offset)
+            ->get();
 
         return $this->json($response, [
             'data' => $posts->map(fn (GeneratedPost $post) => $this->serializePost($post)),
             'total' => $total,
-            'limit' => (int) ($params['limit'] ?? 20),
-            'offset' => (int) ($params['offset'] ?? 0),
+            'limit' => $limit,
+            'offset' => $offset,
         ]);
     }
 
@@ -68,6 +73,105 @@ class ContentController
         return $this->json($response, [
             'data' => $this->generator->getImageConfig()->toPublicArray(),
         ]);
+    }
+
+    public function analyzeThreadImage(Request $request, Response $response): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $uploaded = $this->collectReferenceImages($request);
+
+        if ($uploaded === []) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'reference_image is required',
+            ], 422);
+        }
+
+        $data = $request->getParsedBody();
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $language = !empty($data['language']) ? strtolower(trim((string) $data['language'])) : 'bm';
+
+        try {
+            $processed = $this->imagePreprocessor->processUploads($uploaded, [
+                'high_detail' => false,
+            ]);
+
+            $niches = Niche::where('user_id', $userId)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'description'])
+                ->map(fn (Niche $n) => [
+                    'id' => $n->id,
+                    'name' => $n->name,
+                    'description' => $n->description,
+                ])
+                ->values()
+                ->all();
+
+            $analyzer = new ThreadConfigImageAnalyzer(Bootstrap::init()->get('logger'));
+            $result = $analyzer->analyze($processed, $niches, $language);
+
+            return $this->json($response, [
+                'message' => 'Thread settings suggested',
+                'data' => $result,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json($response, ['error' => true, 'message' => $e->getMessage()], 422);
+        } catch (\RuntimeException $e) {
+            $status = str_contains(strtolower($e->getMessage()), 'rate limit') ? 429 : 502;
+            return $this->json($response, ['error' => true, 'message' => $e->getMessage()], $status);
+        } catch (\Exception $e) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Thread image analysis failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function analyzeHookImage(Request $request, Response $response): Response
+    {
+        $uploaded = $this->collectReferenceImages($request);
+
+        if ($uploaded === []) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'reference_image is required',
+            ], 422);
+        }
+
+        $data = $request->getParsedBody();
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $language = !empty($data['language']) ? strtolower(trim((string) $data['language'])) : 'bm';
+
+        try {
+            $processed = $this->imagePreprocessor->processUploads($uploaded, [
+                'high_detail' => false,
+            ]);
+
+            $analyzer = new HookImageAnalyzer(Bootstrap::init()->get('logger'));
+            $result = $analyzer->analyze($processed, $language);
+
+            return $this->json($response, [
+                'message' => 'Hook suggestions ready',
+                'data' => $result,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json($response, ['error' => true, 'message' => $e->getMessage()], 422);
+        } catch (\RuntimeException $e) {
+            $status = str_contains(strtolower($e->getMessage()), 'rate limit') ? 429 : 502;
+            return $this->json($response, ['error' => true, 'message' => $e->getMessage()], $status);
+        } catch (\Exception $e) {
+            return $this->json($response, [
+                'error' => true,
+                'message' => 'Hook image analysis failed: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function generate(Request $request, Response $response): Response
@@ -172,6 +276,10 @@ class ContentController
             'tone' => !empty($data['tone']) ? $data['tone'] : null,
             'variations' => (int) ($data['variations'] ?? 1),
             'high_detail' => filter_var($data['high_detail'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'hook_instruction' => !empty($data['hook_instruction']) ? trim((string) $data['hook_instruction']) : null,
+            'thread_length' => !empty($data['thread_length']) ? strtolower(trim((string) $data['thread_length'])) : null,
+            'product_context' => !empty($data['product_context']) ? trim((string) $data['product_context']) : null,
+            'language' => !empty($data['language']) ? strtolower(trim((string) $data['language'])) : 'bm',
         ];
     }
 

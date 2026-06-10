@@ -34,9 +34,10 @@ class AIContentReviewer
      *
      * @return array{content: string, tokens_used: int, prompt_tokens: int, completion_tokens: int, time_ms: int}
      */
-    public function review(string $threadContent): array
+    public function review(string $threadContent, string $language = 'bm'): array
     {
         $startTime = microtime(true);
+        $language = $this->normalizeLanguage($language);
 
         $response = $this->httpClient->post('chat/completions', [
             'headers' => [
@@ -46,8 +47,8 @@ class AIContentReviewer
             'json' => [
                 'model'       => $_ENV['OPENAI_MODEL'] ?? 'gpt-4o-mini',
                 'messages'    => [
-                    ['role' => 'system', 'content' => $this->buildSystemPrompt()],
-                    ['role' => 'user',   'content' => $this->buildUserPrompt($threadContent)],
+                    ['role' => 'system', 'content' => $this->buildSystemPrompt($language)],
+                    ['role' => 'user',   'content' => $this->buildUserPrompt($threadContent, $language)],
                 ],
                 'max_tokens'  => (int) ($_ENV['OPENAI_MAX_TOKENS'] ?? 3000),
                 'temperature' => 0.25,
@@ -84,8 +85,40 @@ class AIContentReviewer
         ];
     }
 
-    private function buildSystemPrompt(): string
+    private function normalizeLanguage(?string $language): string
     {
+        return strtolower(trim((string) $language)) === 'en' ? 'en' : 'bm';
+    }
+
+    private function buildSystemPrompt(string $language = 'bm'): string
+    {
+        if ($language === 'en') {
+            return <<<'PROMPT'
+            You are an experienced English editor. Not a copywriter, not an influencer. You edit everyday writing to sound more natural — not to make it more "content creator" or more viral.
+
+            YOUR TASK:
+            Review a Threads thread in casual English and fix ONLY parts that feel awkward, unnatural, or AI-generated. Do not rewrite everything. Do not change sentences that already sound natural.
+
+            FOCUS ON:
+            1. Spelling mistakes
+            2. Awkward phrasing or essay-like transitions ("Therefore,", "In conclusion,")
+            3. Robotic transitions
+            4. Overly hyped or forced excitement
+            5. Consecutive sentences starting with the same word
+            6. Remaining AI phrases ("game-changer", "in today's world", etc.)
+
+            STRICT RULES:
+            - Do not shorten the thread significantly
+            - Do not change meaning, tone, or story flow
+            - Do not add emojis, hashtags, or marketing language
+            - Preserve "Reply 1:", "Reply 2:", etc. exactly as original
+            - Do not introduce new typos
+            - Do not change sentences that are already natural
+
+            Return ONLY the corrected thread. No explanation, no preamble, no summary.
+            PROMPT;
+        }
+
         return <<<'PROMPT'
         Kau editor Bahasa Malaysia berpengalaman. Bukan copywriter, bukan influencer. Kau edit tulisan orang biasa supaya bunyi lebih natural, bukan untuk jadikan ia lebih "content creator" atau lebih viral.
 
@@ -113,8 +146,16 @@ class AIContentReviewer
         PROMPT;
     }
 
-    private function buildUserPrompt(string $threadContent): string
+    private function buildUserPrompt(string $threadContent, string $language = 'bm'): string
     {
+        if ($language === 'en') {
+            return <<<PROMPT
+            Review and polish the following Threads thread. Fix only awkward or unnatural parts. Do not rewrite the whole thing.
+
+            {$threadContent}
+            PROMPT;
+        }
+
         return <<<PROMPT
         Semak dan poles thread Threads berikut. Betulkan sahaja bahagian yang janggal atau tidak natural. Jangan tulis semula keseluruhannya.
 

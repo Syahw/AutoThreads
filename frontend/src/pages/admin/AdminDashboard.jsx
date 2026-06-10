@@ -9,6 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import clsx from 'clsx';
 import api from '../../services/api';
 import PageHeader from '../../components/ui/PageHeader';
+import { useTranslation } from '../../i18n';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
 import { formatDateTime } from '../../utils/date';
@@ -68,6 +69,7 @@ function TargetBadge({ target }) {
 }
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ title: '', message: '', target: 'all', active: true });
 
@@ -118,8 +120,8 @@ export default function AdminDashboard() {
   return (
     <div>
       <PageHeader
-        title="Admin home"
-        description="Platform overview, analytics, announcements, and quick access to admin tools."
+        title={t('admin.homeTitle')}
+        description={t('admin.homeDesc')}
       />
 
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

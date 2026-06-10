@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import PageHeader from '../../components/ui/PageHeader';
+import { useTranslation } from '../../i18n';
 
 function Section({ title, children }) {
   return (
@@ -22,6 +23,7 @@ function Field({ label, children }) {
 }
 
 export default function AdminSettings() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['admin-settings'],
@@ -70,8 +72,8 @@ export default function AdminSettings() {
   return (
     <div>
       <PageHeader
-        title="Platform settings"
-        description="General, scheduler, AI limits, plan quotas, and feature flags."
+        title={t('admin.settingsTitle')}
+        description={t('admin.settingsDesc')}
         action={
           <button
             type="button"
@@ -79,7 +81,7 @@ export default function AdminSettings() {
             disabled={save.isPending}
             onClick={() => save.mutate(form)}
           >
-            {save.isPending ? 'Saving…' : 'Save settings'}
+            {save.isPending ? t('admin.saving') : t('admin.saveSettings')}
           </button>
         }
       />

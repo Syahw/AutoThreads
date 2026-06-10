@@ -81,6 +81,7 @@ class LightHumanizer
         'saya'          => 'aku',
         'anda'          => 'korang',
         'awak'          => 'korang',
+        'kecil'          => 'kecik',
         // Negation normalization
         'tidak boleh'   => 'tak boleh',
         'tidak dapat'   => 'tak dapat',

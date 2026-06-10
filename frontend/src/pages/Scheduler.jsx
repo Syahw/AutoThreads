@@ -10,8 +10,10 @@ import EmptyState from '../components/ui/EmptyState';
 import StatusBadge from '../components/ui/StatusBadge';
 import { formatScheduledAt } from '../utils/schedule';
 import { formatDateTime } from '../utils/date';
+import { useTranslation } from '../i18n';
 
 export default function Scheduler() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [runResult, setRunResult] = useState(null);
   const [showLog, setShowLog] = useState(true);
@@ -65,7 +67,7 @@ export default function Scheduler() {
     onError: (err) => {
       setRunResult({
         ok: false,
-        message: err.response?.data?.message || err.message || 'Run failed',
+        message: err.response?.data?.message || err.message || t('common.runFailed'),
       });
       refetchLog();
     },
@@ -76,8 +78,8 @@ export default function Scheduler() {
   return (
     <div>
       <PageHeader
-        title="Scheduler"
-        description="Posts publish when scheduled time passes and the publish worker runs every minute."
+        title={t('scheduler.title')}
+        description={t('scheduler.description')}
         action={
           <div className="flex flex-wrap gap-2">
             <button
@@ -88,20 +90,20 @@ export default function Scheduler() {
               }}
               className="btn-secondary"
             >
-              <RefreshCw size={16} /> Refresh status
+              <RefreshCw size={16} /> {t('scheduler.refreshStatus')}
             </button>
             <button
               type="button"
               onClick={() => runNowMutation.mutate()}
               disabled={runNowMutation.isPending || (diagnostics?.due_now_count ?? 0) === 0}
               className="btn-primary"
-              title="Publish due posts now (same as cron, without waiting for Task Scheduler)"
+              title={t('scheduler.runDuePostsTitle')}
             >
               {runNowMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-              Run due posts now
+              {t('scheduler.runDuePosts')}
             </button>
             <Link to="/content" className="btn-secondary">
-              <Calendar size={16} /> Content
+              <Calendar size={16} /> {t('nav.content')}
             </Link>
           </div>
         }
@@ -112,35 +114,38 @@ export default function Scheduler() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Terminal size={18} className="text-brand-600 dark:text-brand-400" />
-            <h2 className="text-heading text-lg font-semibold">Schedule status</h2>
+            <h2 className="text-heading text-lg font-semibold">{t('scheduler.scheduleStatus')}</h2>
           </div>
           <span
             className={`badge ${cronOk ? 'badge-approved' : 'badge-scheduled'}`}
           >
-            {cronOk ? 'Cron ran in last 3 min' : 'Cron not detected recently'}
+            {cronOk ? t('scheduler.cronOk') : t('scheduler.cronNotOk')}
           </span>
         </div>
 
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div className="panel-muted p-3">
-            <dt className="text-muted text-xs">Server time</dt>
+            <dt className="text-muted text-xs">{t('scheduler.serverTime')}</dt>
             <dd className="text-heading font-semibold">{diagnostics?.server_now ? formatDateTime(diagnostics.server_now) : '—'}</dd>
             <dd className="text-muted text-xs">{diagnostics?.timezone}</dd>
           </div>
           <div className="panel-muted p-3">
-            <dt className="text-muted text-xs">Queued</dt>
+            <dt className="text-muted text-xs">{t('scheduler.queued')}</dt>
             <dd className="text-heading font-semibold">{diagnostics?.queued_count ?? 0}</dd>
           </div>
           <div className="panel-muted p-3">
-            <dt className="text-muted text-xs">Due right now</dt>
+            <dt className="text-muted text-xs">{t('scheduler.dueNow')}</dt>
             <dd className={`font-semibold ${(diagnostics?.due_now_count ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-heading'}`}>
               {diagnostics?.due_now_count ?? 0}
             </dd>
           </div>
           <div className="panel-muted p-3">
-            <dt className="text-muted text-xs">Failed / stuck</dt>
+            <dt className="text-muted text-xs">{t('scheduler.failedStuck')}</dt>
             <dd className="text-heading font-semibold">
-              {diagnostics?.failed_count ?? 0} failed · {diagnostics?.processing_count ?? 0} processing
+              {t('scheduler.failedProcessing', {
+                failed: diagnostics?.failed_count ?? 0,
+                processing: diagnostics?.processing_count ?? 0,
+              })}
             </dd>
           </div>
         </dl>
@@ -149,10 +154,9 @@ export default function Scheduler() {
           <div className="alert-error mt-4 flex items-start gap-2">
             <AlertCircle size={18} className="shrink-0" />
             <div className="text-sm">
-              <p className="font-medium">Task Scheduler may not be running or PHP path is wrong.</p>
+              <p className="font-medium">{t('scheduler.cronWarning')}</p>
               <p className="mt-1 opacity-90">
-                Point the task at <code className="code-inline">backend\cron\run_publish.bat</code> and check{' '}
-                <code className="code-inline">backend\storage\logs\cron-publish.log</code> below.
+                {t('scheduler.cronWarningBody')}
               </p>
             </div>
           </div>
@@ -165,7 +169,11 @@ export default function Scheduler() {
               {runResult.ok ? (
                 <>
                   <p className="font-medium">
-                    Processed {runResult.data?.processed ?? 0} · Published {runResult.data?.published ?? 0} · Failed {runResult.data?.failed ?? 0}
+                    {t('scheduler.runResult', {
+                      processed: runResult.data?.processed ?? 0,
+                      published: runResult.data?.published ?? 0,
+                      failed: runResult.data?.failed ?? 0,
+                    })}
                   </p>
                   {runResult.data?.details?.map((d) => (
                     <p key={d.scheduled_post_id} className="mt-1 text-xs opacity-90">
@@ -186,8 +194,8 @@ export default function Scheduler() {
 
       <div className="card overflow-hidden mb-6">
         <div className="border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-          <h2 className="text-heading text-lg font-semibold">Queued posts</h2>
-          <p className="text-muted text-sm">Waiting for worker when scheduled time ≤ server time.</p>
+          <h2 className="text-heading text-lg font-semibold">{t('scheduler.queuedPosts')}</h2>
+          <p className="text-muted text-sm">{t('scheduler.queuedPostsDesc')}</p>
         </div>
 
         {isLoading ? (
@@ -199,11 +207,11 @@ export default function Scheduler() {
         ) : scheduled?.length === 0 ? (
           <EmptyState
             icon={Calendar}
-            title="No posts scheduled"
-            description="Approve content, pick date/time on Content Generator, then Schedule."
+            title={t('scheduler.emptyTitle')}
+            description={t('scheduler.emptyDesc')}
             action={
               <Link to="/content" className="btn-primary">
-                Go to content
+                {t('scheduler.goToContent')}
               </Link>
             }
           />
@@ -216,7 +224,7 @@ export default function Scheduler() {
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-heading truncate font-medium">
-                    {item.generated_post?.hook || item.generatedPost?.hook || 'Scheduled thread'}
+                    {item.generated_post?.hook || item.generatedPost?.hook || t('scheduler.scheduledThread')}
                   </p>
                   <div className="text-muted mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     <span className="flex items-center gap-1">
@@ -236,7 +244,7 @@ export default function Scheduler() {
                     disabled={cancelMutation.isPending}
                     className="btn-danger !py-2 !text-xs"
                   >
-                    <X size={14} /> Cancel
+                    <X size={14} /> {t('common.cancel')}
                   </button>
                 </div>
               </li>
@@ -248,13 +256,13 @@ export default function Scheduler() {
       {failedPosts?.length > 0 && (
         <div className="card overflow-hidden">
           <div className="border-b border-red-200 bg-red-50/50 px-6 py-4 dark:border-red-900/50 dark:bg-red-950/30">
-            <h2 className="text-lg font-semibold text-red-800 dark:text-red-300">Failed schedules</h2>
-            <p className="text-sm text-red-700 dark:text-red-400">Check cron log or use Run due posts now after fixing the issue.</p>
+            <h2 className="text-lg font-semibold text-red-800 dark:text-red-300">{t('scheduler.failedSchedules')}</h2>
+            <p className="text-sm text-red-700 dark:text-red-400">{t('scheduler.failedSchedulesDesc')}</p>
           </div>
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {failedPosts.map((item) => (
               <li key={item.id} className="px-6 py-4">
-                <p className="text-heading font-medium">{item.generated_post?.hook || 'Post'}</p>
+                <p className="text-heading font-medium">{item.generated_post?.hook || t('scheduler.post')}</p>
                 {item.last_error && (
                   <p className="mt-1 text-xs text-red-600 dark:text-red-400">{item.last_error}</p>
                 )}
