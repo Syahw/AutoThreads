@@ -82,6 +82,75 @@ class ContentGenerator
      *   7. Persist to DB
      *   8. Record hook for future diversity checks
      */
+    /**
+     * Generate hooks only (no thread replies).
+     */
+    public function generateHooks(array $config): GeneratedPost
+    {
+        $userId = $config['user_id'];
+        $affiliateLinkId = $config['affiliate_link_id'] ?? null;
+        $hookCount = max(1, min(20, (int) ($config['hook_count'] ?? 5)));
+        $affiliateLink = $affiliateLinkId ? AffiliateLink::find($affiliateLinkId) : null;
+
+        $prompt = $this->promptBuilder->buildHooksOnly([
+            'affiliate' => $affiliateLink,
+            'hook_style' => $config['hook_style'] ?? null,
+            'hook_topic' => $config['hook_topic'] ?? null,
+            'hook_count' => $hookCount,
+            'product_context' => $config['product_context'] ?? null,
+            'language' => $config['language'] ?? 'bm',
+        ]);
+
+        $language = $prompt['language'] ?? ($config['language'] ?? 'bm');
+        $maxTokens = min(2000, max(400, $hookCount * 60));
+
+        $aiResponse = $this->callOpenAI($prompt['system'], $prompt['user'], $maxTokens);
+        $humanized = $this->lightHumanizer->processHooksOnly($aiResponse['content']);
+
+        $qualityCheck = $this->qualityChecker->check($humanized);
+        $scores = $this->scorer->score($humanized);
+
+        $post = GeneratedPost::create([
+            'user_id' => $userId,
+            'niche_id' => null,
+            'topic_id' => $config['topic_id'] ?? null,
+            'affiliate_link_id' => $affiliateLinkId,
+            'content' => $humanized['content'],
+            'hook' => $humanized['hook'],
+            'cta' => '',
+            'hashtags' => [],
+            'category' => 'hook_only',
+            'tone' => null,
+            'writing_style' => $prompt['hook_style'] ?? null,
+            'quality_score' => $scores['overall'],
+            'humanization_score' => $scores['humanization'],
+            'status' => 'draft',
+            'ai_model' => $aiResponse['model'],
+            'tokens_used' => $aiResponse['tokens_used'],
+            'generation_cost' => $this->calculateCost($aiResponse['tokens_used']),
+            'variations_count' => 1,
+            'metadata' => [
+                'generation_type' => 'hooks_only',
+                'generation_mode' => 'hooks_only',
+                'hook_count' => count($humanized['hooks'] ?? []),
+                'hooks' => $humanized['hooks'] ?? [],
+                'hook_style' => $prompt['hook_style'] ?? null,
+                'language' => $language,
+                'hook_topic' => $config['hook_topic'] ?? null,
+                'generation_time_ms' => $aiResponse['time_ms'],
+                'quality_flags' => $qualityCheck['flags'],
+            ],
+        ]);
+
+        foreach ($humanized['hooks'] ?? [] as $hook) {
+            $this->diversityManager->record($hook, 'hook_only');
+        }
+
+        $this->logAiUsage((int) $userId, $aiResponse, 'generate_hooks');
+
+        return $post;
+    }
+
     public function generate(array $config): GeneratedPost
     {
         $userId          = $config['user_id'];
@@ -105,6 +174,8 @@ class ContentGenerator
             'cta_style'       => $affiliateLink?->cta_style ?? 'soft',
             'diversity_hint'  => $this->diversityManager->buildDiversityHint(),
             'hook_instruction' => $config['hook_instruction'] ?? null,
+            'hook_style'      => $config['hook_style'] ?? null,
+            'hook_topic'      => $config['hook_topic'] ?? null,
             'thread_length'   => $config['thread_length'] ?? null,
             'product_context' => $config['product_context'] ?? null,
             'language' => $config['language'] ?? 'bm',
@@ -219,6 +290,8 @@ class ContentGenerator
             'target_audience' => $niche?->target_audience,
             'cta_style' => $affiliateLink?->cta_style ?? 'soft',
             'hook_instruction' => $config['hook_instruction'] ?? null,
+            'hook_style' => $config['hook_style'] ?? null,
+            'hook_topic' => $config['hook_topic'] ?? null,
             'thread_length' => $config['thread_length'] ?? null,
             'product_context' => $config['product_context'] ?? null,
             'language' => $config['language'] ?? 'bm',
@@ -363,7 +436,7 @@ class ContentGenerator
     /**
      * Call OpenAI Chat Completions API (text-only generation).
      */
-    private function callOpenAI(string $systemPrompt, string $userPrompt): array
+    private function callOpenAI(string $systemPrompt, string $userPrompt, ?int $maxTokens = null): array
     {
         $startTime = microtime(true);
 
@@ -378,7 +451,7 @@ class ContentGenerator
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
-                'max_tokens' => (int) ($_ENV['OPENAI_MAX_TOKENS'] ?? 3000),
+                'max_tokens' => $maxTokens ?? (int) ($_ENV['OPENAI_MAX_TOKENS'] ?? 3000),
                 'temperature' => (float) ($_ENV['OPENAI_TEMPERATURE'] ?? 0.75),
                 'presence_penalty' => 0.6,
                 'frequency_penalty' => 0.4,

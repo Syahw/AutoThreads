@@ -106,7 +106,22 @@ class PromptBuilder
             $userPrompt .= "\n\nPRODUCT CONTEXT: {$productContext}";
         }
 
+        $hookStyle = trim((string) ($config['hook_style'] ?? ''));
         $hookInstruction = trim((string) ($config['hook_instruction'] ?? ''));
+
+        if ($hookStyle !== '' && HookBuilderCatalog::isValidStyle($hookStyle)) {
+            $productName = $affiliate?->product_name ?? '';
+            $hookTopic = trim((string) ($config['hook_topic'] ?? ''));
+            $hookInstruction = HookBuilderCatalog::buildInstruction(
+                $hookStyle,
+                $hookTopic,
+                $productName,
+                $productContext,
+                $language,
+            );
+            $systemPrompt .= "\n\n" . HookBuilderCatalog::systemAddendum($hookStyle, $language);
+        }
+
         if ($hookInstruction !== '') {
             $userPrompt .= "\n\n" . $hookInstruction;
         }
@@ -114,11 +129,137 @@ class PromptBuilder
         return [
             'system' => $systemPrompt,
             'user' => $userPrompt,
+            'hook_style' => $hookStyle !== '' ? $hookStyle : null,
             'tone_used' => $tone,
             'style_used' => $style,
             'reply_count' => $replyCount,
             'language' => $language,
         ];
+    }
+
+    /**
+     * Build prompts for hooks-only generation (no thread replies).
+     *
+     * @return array{system: string, user: string, hook_style: ?string, hook_count: int, language: string}
+     */
+    public function buildHooksOnly(array $config): array
+    {
+        $affiliate = $config['affiliate'] ?? null;
+        $language = $this->normalizeLanguage($config['language'] ?? 'bm');
+        $hookCount = max(1, min(20, (int) ($config['hook_count'] ?? 5)));
+        $hookStyle = trim((string) ($config['hook_style'] ?? ''));
+        $productContext = trim((string) ($config['product_context'] ?? ''));
+        $productName = $affiliate?->product_name ?? '';
+        $hookTopic = trim((string) ($config['hook_topic'] ?? ''));
+
+        if ($hookStyle === '' || !HookBuilderCatalog::isValidStyle($hookStyle)) {
+            throw new \InvalidArgumentException('A valid hook_style is required for hooks-only generation');
+        }
+
+        $systemPrompt = $this->buildHooksOnlySystemPrompt($language, $hookCount);
+        $systemPrompt .= "\n\n" . HookBuilderCatalog::systemAddendum($hookStyle, $language);
+
+        $userPrompt = HookBuilderCatalog::buildInstruction(
+            $hookStyle,
+            $hookTopic,
+            $productName,
+            $productContext,
+            $language,
+            true,
+        );
+
+        $userPrompt .= "\n\n" . $this->buildHooksOnlyOutputSection($hookCount, $language);
+
+        return [
+            'system' => $systemPrompt,
+            'user' => $userPrompt,
+            'hook_style' => $hookStyle,
+            'hook_count' => $hookCount,
+            'language' => $language,
+        ];
+    }
+
+    private function buildHooksOnlySystemPrompt(string $language, int $hookCount): string
+    {
+        if ($language === 'en') {
+            return <<<PROMPT
+            You are an expert Malaysian social media copywriter.
+
+            Your task is to generate HIGH-QUALITY hooks in natural, casual English suited for Malaysian social audiences (TikTok, Threads, Facebook, Instagram).
+
+            Requirements:
+            - Sound like a real Malaysian person online.
+            - Natural, conversational, and relatable.
+            - Avoid robotic, generic, or overly salesy language.
+            - Avoid excessive emojis.
+            - Use short, punchy sentences.
+            - Create curiosity and encourage people to keep reading.
+            - Hooks should feel like personal experiences, observations, problems, or recommendations.
+            - Do NOT start every hook with the same structure.
+            - Vary sentence patterns naturally.
+            - Maximum 15 words per hook.
+            - Never mention product names in hooks.
+            - Never mention the hook category name.
+            - Avoid ALL CAPS and fake clickbait.
+            - Prefer "you" in a casual friend tone.
+
+            Generate exactly {$hookCount} unique hooks.
+            Output ONLY the hooks in the required format. No intro or outro.
+            PROMPT;
+        }
+
+        return <<<PROMPT
+        Kau seorang penulis copy social media Malaysia yang pakar.
+
+        Tugas kau: hasilkan hook BERKUALITI tinggi dalam Bahasa Melayu untuk kandungan social media (TikTok, Threads, Facebook, Instagram).
+
+        Keperluan:
+        - Bunyi macam orang Malaysia sebenar.
+        - Natural, conversational, relatable.
+        - Elak bahasa robot, generic, atau terlalu jualan.
+        - Elak emoji berlebihan.
+        - Guna ayat pendek, punchy.
+        - Cipta curiosity dan galakkan orang terus baca.
+        - Hook rasa macam pengalaman peribadi, pemerhatian, masalah, atau cadangan.
+        - JANGAN mula setiap hook dengan struktur sama.
+        - Vary pattern ayat secara natural.
+        - Maximum 15 patah perkataan setiap hook.
+        - Jangan sebut nama produk dalam hook.
+        - Jangan sebut nama kategori hook.
+        - Elak ALL CAPS dan clickbait palsu.
+        - Elak "anda" — prefer "kau", "korang", atau BM santai.
+
+        Hasilkan tepat {$hookCount} hook unik.
+        Output HANYA hook dalam format yang diminta. Tiada intro/outro.
+        PROMPT;
+    }
+
+    private function buildHooksOnlyOutputSection(int $hookCount, string $language): string
+    {
+        $lines = [];
+        if ($language === 'en') {
+            $lines[] = 'OUTPUT FORMAT (required):';
+            for ($i = 1; $i <= $hookCount; $i++) {
+                $lines[] = "Hook {$i}:";
+                $lines[] = '[one unique hook, max 15 words]';
+                $lines[] = '';
+            }
+            $lines[] = "Write exactly {$hookCount} hooks. Each must be distinct in structure and angle.";
+            $lines[] = 'Do not write thread replies or anything outside the hooks.';
+
+            return implode("\n", $lines);
+        }
+
+        $lines[] = 'FORMAT OUTPUT (wajib):';
+        for ($i = 1; $i <= $hookCount; $i++) {
+            $lines[] = "Hook {$i}:";
+            $lines[] = '[satu hook unik, max 15 patah perkataan]';
+            $lines[] = '';
+        }
+        $lines[] = "Tulis tepat {$hookCount} hook. Setiap satu mesti berbeza struktur dan sudut.";
+        $lines[] = 'Jangan tulis reply thread atau apa-apa selain hook.';
+
+        return implode("\n", $lines);
     }
 
     private function normalizeLanguage(?string $language): string
@@ -182,7 +323,7 @@ class PromptBuilder
         - Tulis {$replyCount} replies
         - {$lengthHint}
         - Setiap reply WAJIB substantif, bukan one-liner kosong
-        - Hook biasanya sekitar 20-45 patah perkataan, tapi ikut rasa natural
+        - Hook biasanya 15 patah perkataan (max) kalau gaya hook dipilih; kalau tidak, 20-45 patah perkataan
         - Middle replies biasanya 30-80 patah perkataan setiap satu (cerita, detail, konteks, perasaan)
         - Last reply biasanya 30-60 patah perkataan
         - Total thread target: 400-800+ patah perkataan keseluruhan
@@ -220,6 +361,7 @@ class PromptBuilder
         Reply 1 (hook):
         - Mula dengan specific moment, thought, atau scene, bukan announcement "aku nak kongsi"
         - Jangan reveal semua. Tarik reader masuk slowly
+        - Kalau ada HOOK STYLE ACTIVE di bawah, Reply 1 WAJIB ikut gaya tu (max 15 patah perkataan, punchy)
 
         Middle replies:
         - Build cerita layer by layer, detail spesifik (nama tempat, scene, perasaan sebenar)
@@ -305,7 +447,7 @@ class PromptBuilder
         - Write {$replyCount} replies
         - {$lengthHint}
         - Each reply MUST be substantive, not empty one-liners
-        - Hook is usually around 20-45 words, but follow what feels natural
+        - Hook is usually max 15 words when a hook style is selected; otherwise 20-45 words
         - Middle replies are usually 30-80 words each (story, detail, context, feeling)
         - Last reply is usually 30-60 words
         - Total thread target: 400-800+ words overall
@@ -341,6 +483,7 @@ class PromptBuilder
         Reply 1 (hook):
         - Start with a specific moment, thought, or scene — not "let me share"
         - Do not reveal everything. Pull the reader in slowly
+        - If HOOK STYLE ACTIVE appears below, Reply 1 MUST follow that style (max 15 words, punchy)
 
         Middle replies:
         - Build the story layer by layer with specific detail (place, scene, real feelings)

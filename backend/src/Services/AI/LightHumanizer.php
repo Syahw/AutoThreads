@@ -20,6 +20,12 @@ namespace AutoThreads\Services\AI;
  */
 class LightHumanizer
 {
+    private Humanizer $humanizer;
+
+    public function __construct()
+    {
+        $this->humanizer = new Humanizer();
+    }
     /**
      * AI / marketing buzzwords to remove entirely (no replacement).
      * Sorted by length descending at runtime to avoid partial matches.
@@ -106,6 +112,38 @@ class LightHumanizer
         'konten'         => 'content',
     ];
 
+    /**
+     * @return array{content: string, hook: string, cta: string, hashtags: array, replies: array, hooks: list<string>}
+     */
+    public function processHooksOnly(string $rawContent): array
+    {
+        $hooks = $this->humanizer->parseHooks($rawContent);
+        $polished = [];
+
+        foreach ($hooks as $hook) {
+            $line = $this->applyRemovals($hook);
+            $line = $this->applyFormalToNatural($line);
+            $line = $this->removeEmDashes($line);
+            $line = $this->limitExclamations($line, maxAllowed: 1);
+            $line = $this->collapseSpaces($line);
+            $line = $this->humanizer->polishHook($line);
+            if ($line !== '') {
+                $polished[] = $line;
+            }
+        }
+
+        $content = $this->humanizer->formatHooksContent($polished);
+
+        return [
+            'content' => $content,
+            'hook' => $polished[0] ?? '',
+            'cta' => '',
+            'hashtags' => [],
+            'replies' => [],
+            'hooks' => $polished,
+        ];
+    }
+
     public function process(string $rawContent): array
     {
         $replies = $this->parseThreadReplies($rawContent);
@@ -118,6 +156,9 @@ class LightHumanizer
                 $processed = $this->removeEmDashes($processed);
                 $processed = $this->limitExclamations($processed, maxAllowed: 1);
                 $processed = $this->collapseSpaces($processed);
+                if ($i === 0) {
+                    $processed = $this->humanizer->polishHook($processed);
+                }
                 $processedReplies[$i] = trim($processed);
             }
 

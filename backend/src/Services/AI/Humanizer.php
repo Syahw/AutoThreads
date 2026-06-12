@@ -209,6 +209,92 @@ class Humanizer
 
     ];
    
+    /**
+     * Polish Reply 1 hooks — keep short, natural, and free of formal/salesy patterns.
+     */
+    /**
+     * @return list<string>
+     */
+    public function parseHooks(string $content): array
+    {
+        $hooks = [];
+        $parts = preg_split('/Hook\s*\d+\s*:/i', $content, -1, PREG_SPLIT_NO_EMPTY);
+
+        foreach ($parts as $part) {
+            $trimmed = trim($part);
+            if ($trimmed !== '') {
+                $hooks[] = $trimmed;
+            }
+        }
+
+        if ($hooks === []) {
+            $lines = array_values(array_filter(array_map('trim', explode("\n", $content))));
+            if ($lines !== []) {
+                $hooks = $lines;
+            }
+        }
+
+        return $hooks;
+    }
+
+    /**
+     * @param  list<string>  $hooks
+     */
+    public function formatHooksContent(array $hooks): string
+    {
+        $sections = [];
+        foreach ($hooks as $i => $hook) {
+            $hook = trim($hook);
+            if ($hook === '') {
+                continue;
+            }
+            $sections[] = 'Hook ' . ($i + 1) . ":\n{$hook}";
+        }
+
+        return implode("\n\n", $sections);
+    }
+
+    public function polishHook(string $hook): string
+    {
+        $hook = trim($hook);
+        if ($hook === '') {
+            return $hook;
+        }
+
+        $hook = $this->removeAIPhrases($hook);
+        $hook = $this->removeEmDashes($hook);
+        $hook = $this->dedupeHype($hook);
+        $hook = preg_replace('/\banda\b/iu', 'korang', $hook) ?? $hook;
+        $hook = preg_replace_callback('/\b([A-Z]{2,})\b/u', fn ($m) => mb_strtolower($m[1]), $hook) ?? $hook;
+        $hook = preg_replace('/\s{2,}/', ' ', $hook) ?? $hook;
+
+        return $this->trimHookLength($hook, 15);
+    }
+
+  /**
+     * Trim hook to a max word count while keeping the first complete thought.
+     */
+    private function trimHookLength(string $hook, int $maxWords): string
+    {
+        $words = preg_split('/\s+/u', trim($hook), -1, PREG_SPLIT_NO_EMPTY);
+        if ($words === false || count($words) <= $maxWords) {
+            return trim($hook);
+        }
+
+        $trimmed = implode(' ', array_slice($words, 0, $maxWords));
+        $lastPunct = max(
+            (int) mb_strrpos($trimmed, '.'),
+            (int) mb_strrpos($trimmed, '?'),
+            (int) mb_strrpos($trimmed, '!'),
+        );
+
+        if ($lastPunct > (int) (mb_strlen($trimmed) * 0.5)) {
+            return trim(mb_substr($trimmed, 0, $lastPunct + 1));
+        }
+
+        return rtrim($trimmed, ',;:') . '...';
+    }
+
     public function process(string $rawContent): array
     {
         // Parse thread replies

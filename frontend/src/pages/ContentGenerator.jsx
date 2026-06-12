@@ -12,14 +12,15 @@ import StatusBadge from '../components/ui/StatusBadge';
 import EmptyState from '../components/ui/EmptyState';
 import ScheduleDateTimePicker from '../components/ui/ScheduleDateTimePicker';
 import AffiliateLinkPicker from '../components/content/AffiliateLinkPicker';
+import ContentLanguagePicker from '../components/content/ContentLanguagePicker';
+import { readStoredLanguage } from '../lib/language';
 import { defaultScheduleDatetimeLocal, isWithinPostingWindow, toSchedulerPayload } from '../utils/schedule';
 import { confirmDelete, confirmPostedDelete, confirmRevertToDraft } from '../utils/swal';
-import { useLanguageStore } from '../stores/languageStore';
 import { useTranslation } from '../i18n';
 import {
   getHookBuilderGroups,
   buildHookPrompt,
-  hasHookSelections,
+  getSelectedHookStyle,
   sanitizeHookSelections,
   toggleHookOption,
 } from '../utils/hookBuilder';
@@ -39,12 +40,13 @@ const GENERATION_TABS = [
 ];
 
 const THREAD_LENGTHS = ['short', 'medium', 'long'];
+const HOOK_COUNTS = [3, 5, 10];
 const DRAFTS_PER_PAGE = 3;
 
 export default function ContentGenerator() {
   const queryClient = useQueryClient();
-  const language = useLanguageStore((s) => s.language);
-  const { t } = useTranslation();
+  const { t, language: uiLanguage } = useTranslation();
+  const [contentLanguage, setContentLanguage] = useState(() => readStoredLanguage());
   const [publishError, setPublishError] = useState(null);
   const [config, setConfig] = useState({
     niche_id: '', category: 'general', tone: '', thread_length: 'medium',
@@ -61,19 +63,18 @@ export default function ContentGenerator() {
   const [hookTopic, setHookTopic] = useState('');
   const [hookReferencePreview, setHookReferencePreview] = useState(null);
   const [hookImageAnalysis, setHookImageAnalysis] = useState(null);
+  const [hookCount, setHookCount] = useState(5);
 
-  const hookBuilderGroups = useMemo(() => getHookBuilderGroups(language), [language]);
+  const hookBuilderGroups = useMemo(() => getHookBuilderGroups(uiLanguage), [uiLanguage]);
   const hookPrompt = useMemo(
     () => buildHookPrompt(
       hookSelections,
       hookTopic,
-      language,
+      contentLanguage,
       hookImageAnalysis?.product_summary ?? '',
     ),
-    [hookSelections, hookTopic, language, hookImageAnalysis],
+    [hookSelections, hookTopic, contentLanguage, hookImageAnalysis],
   );
-  const hookBuilderActive = hasHookSelections(hookSelections) || hookTopic.trim() !== '';
-
   const { data: niches } = useQuery({
     queryKey: ['niches'],
     queryFn: () => api.get('/niches').then((r) => r.data.data),
@@ -122,7 +123,7 @@ export default function ContentGenerator() {
       tone: isHookMode ? undefined : (config.tone || undefined),
       affiliate_link_id: affiliateLinkId ? parseInt(affiliateLinkId, 10) : undefined,
       variations: 1,
-      language,
+      language: contentLanguage,
     };
 
     if (!isHookMode) {
@@ -132,8 +133,22 @@ export default function ContentGenerator() {
       }
     }
 
-    if (isHookMode && hookPrompt) {
-      base.hook_instruction = hookPrompt;
+    if (isHookMode) {
+      base.generation_mode = 'hooks_only';
+      base.hook_count = hookCount;
+      const hookStyle = getSelectedHookStyle(hookSelections);
+      if (hookStyle) {
+        base.hook_style = hookStyle;
+      }
+      if (hookTopic.trim()) {
+        base.hook_topic = hookTopic.trim();
+      }
+      if (hookImageAnalysis?.product_summary) {
+        base.product_context = hookImageAnalysis.product_summary;
+      }
+      if (hookPrompt) {
+        base.hook_instruction = hookPrompt;
+      }
     }
 
     return { type: 'json', payload: base };
@@ -182,7 +197,7 @@ export default function ContentGenerator() {
   });
 
   const canGenerate = isHookMode
-    ? hookBuilderActive && !analyzeHookImageMutation.isPending
+    ? Boolean(getSelectedHookStyle(hookSelections)) && !analyzeHookImageMutation.isPending
     : !analyzeThreadImageMutation.isPending;
 
   const generateMutation = useMutation({
@@ -301,7 +316,15 @@ export default function ContentGenerator() {
   const threadsAccount = threadsAccounts?.[0];
   const hasThreadsAccount = !!threadsAccount;
   const canPublishChain = threadsAccount?.can_publish_reply_chain ?? false;
-  const replyCount = (post) => post.metadata?.replies?.length ?? null;
+  const replyCount = (post) => {
+    if (post.metadata?.generation_type === 'hooks_only') return null;
+    return post.metadata?.replies?.length ?? null;
+  };
+
+  const hookOnlyCount = (post) => {
+    if (post.metadata?.generation_type !== 'hooks_only') return null;
+    return post.metadata?.hook_count ?? post.metadata?.hooks?.length ?? null;
+  };
   const hasLinkPlaceholder = (post) => /\[link\]/i.test(post.content ?? '');
 
   const startEdit = (post) => {
@@ -369,7 +392,7 @@ export default function ContentGenerator() {
 
     const formData = new FormData();
     formData.append('reference_image', file);
-    formData.append('language', language);
+    formData.append('language', contentLanguage);
     analyzeThreadImageMutation.mutate(formData);
   };
 
@@ -397,7 +420,7 @@ export default function ContentGenerator() {
 
     const formData = new FormData();
     formData.append('reference_image', file);
-    formData.append('language', language);
+    formData.append('language', contentLanguage);
     analyzeHookImageMutation.mutate(formData);
   };
 
@@ -442,7 +465,6 @@ export default function ContentGenerator() {
           <p className="text-muted text-sm">
             {isHookMode ? t('content.newGenerationDescHook') : t('content.newGenerationDesc')}
           </p>
-          <p className="text-muted mt-2 text-xs">{t('language.hint')}</p>
         </div>
 
         <div
@@ -524,6 +546,8 @@ export default function ContentGenerator() {
               )}
             </div>
 
+            <ContentLanguagePicker value={contentLanguage} onChange={setContentLanguage} />
+
             <div>
               <label className="text-label mb-1.5 block text-sm font-medium">{t('content.hookTopic')}</label>
               <input
@@ -533,6 +557,32 @@ export default function ContentGenerator() {
                 placeholder={t('content.hookTopicPlaceholder')}
                 className="input-field"
               />
+            </div>
+
+            <div>
+              <span className="text-label mb-2 block text-sm font-medium">{t('content.hookCount')}</span>
+              <p className="text-muted mb-2 text-xs">{t('content.hookCountDesc')}</p>
+              <div className="flex flex-wrap gap-2">
+                {HOOK_COUNTS.map((count) => {
+                  const selected = hookCount === count;
+                  return (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setHookCount(count)}
+                      className={clsx(
+                        'rounded-full px-3 py-1.5 text-xs font-medium transition-all',
+                        selected
+                          ? 'bg-brand-600 text-white shadow-sm ring-1 ring-brand-600'
+                          : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:ring-brand-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:ring-brand-500',
+                      )}
+                    >
+                      {selected && <Check size={12} className="mr-1 inline" />}
+                      {count}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {hookBuilderGroups.map((group) => (
@@ -573,11 +623,11 @@ export default function ContentGenerator() {
               affiliates={affiliates ?? []}
             />
 
-            {!hookBuilderActive && (
+            {!getSelectedHookStyle(hookSelections) && (
               <p className="text-muted text-xs">{t('content.selectHookFirst')}</p>
             )}
 
-            {hookBuilderActive && (
+            {(getSelectedHookStyle(hookSelections) || hookTopic.trim()) && (
               <button
                 type="button"
                 onClick={clearHookBuilder}
@@ -589,6 +639,8 @@ export default function ContentGenerator() {
           </div>
         ) : (
           <div className="mb-5 space-y-5">
+            <ContentLanguagePicker value={contentLanguage} onChange={setContentLanguage} />
+
             <div className="panel-muted space-y-3 p-4">
               <div>
                 <label className="text-label flex items-center gap-1.5 text-sm font-medium">
@@ -733,7 +785,7 @@ export default function ContentGenerator() {
           {generateMutation.isPending
             ? t('common.generating')
             : isHookMode
-              ? t('content.generateHook')
+              ? t('content.generateHooks', { count: hookCount })
               : t('common.generateContent')}
         </button>
       </div>
@@ -771,6 +823,11 @@ export default function ContentGenerator() {
                     <span className="badge-draft">{t(`content.categories.${post.category}`, {}) !== `content.categories.${post.category}` ? t(`content.categories.${post.category}`) : post.category?.replace(/_/g, ' ')}</span>
                     {post.tone && <span className="badge-posted">{t(`content.tones.${post.tone}`, {}) !== `content.tones.${post.tone}` ? t(`content.tones.${post.tone}`) : post.tone}</span>}
                     <span className="badge bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">{t('common.score')} {post.quality_score}</span>
+                    {hookOnlyCount(post) != null && (
+                      <span className="badge bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                        {hookOnlyCount(post)} {t('content.hooks')}
+                      </span>
+                    )}
                     {replyCount(post) != null && (
                       <span className="badge bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">{replyCount(post)} {t('common.replies')}</span>
                     )}

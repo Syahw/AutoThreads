@@ -191,6 +191,14 @@ class ContentController
         $config = $this->buildGenerationConfig($userId, $data);
 
         try {
+            if (($config['generation_mode'] ?? 'thread') === 'hooks_only') {
+                $post = $this->generator->generateHooks($config);
+                return $this->json($response, [
+                    'message' => 'Hooks generated',
+                    'data' => $this->serializePost($post),
+                ], 201);
+            }
+
             if (($config['variations'] ?? 1) > 1) {
                 $posts = $this->generator->generateVariations($config, $config['variations']);
                 return $this->json($response, [
@@ -277,6 +285,12 @@ class ContentController
             'variations' => (int) ($data['variations'] ?? 1),
             'high_detail' => filter_var($data['high_detail'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'hook_instruction' => !empty($data['hook_instruction']) ? trim((string) $data['hook_instruction']) : null,
+            'hook_style' => !empty($data['hook_style']) ? strtolower(trim((string) $data['hook_style'])) : null,
+            'hook_topic' => !empty($data['hook_topic']) ? trim((string) $data['hook_topic']) : null,
+            'hook_count' => max(1, min(20, (int) ($data['hook_count'] ?? 5))),
+            'generation_mode' => !empty($data['generation_mode'])
+                ? strtolower(trim((string) $data['generation_mode']))
+                : 'thread',
             'thread_length' => !empty($data['thread_length']) ? strtolower(trim((string) $data['thread_length'])) : null,
             'product_context' => !empty($data['product_context']) ? trim((string) $data['product_context']) : null,
             'language' => !empty($data['language']) ? strtolower(trim((string) $data['language'])) : 'bm',
